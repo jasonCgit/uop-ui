@@ -11,6 +11,7 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import NotificationsIcon from '@mui/icons-material/Notifications'
 import GroupsIcon from '@mui/icons-material/Groups'
 import EmailIcon from '@mui/icons-material/Email'
+import BadgeIcon from '@mui/icons-material/Badge'
 import {
   loadNotifications, saveNotification, deleteNotification,
 } from './viewCentralStorage'
@@ -122,7 +123,7 @@ export default function NotificationDrawer({ open, onClose, viewId, viewName }) 
                 No notifications configured
               </Typography>
               <Typography color="text.disabled" sx={{ ...fTiny, mt: 0.5 }}>
-                Add a notification to receive alerts via Teams or Email
+                Add a notification to receive alerts via Teams, Email, or Team Roles
               </Typography>
             </Box>
           ) : (
@@ -158,6 +159,17 @@ export default function NotificationDrawer({ open, onClose, viewId, viewName }) 
                     ))}
                   </Box>
 
+                  {/* Team names */}
+                  {notif.selectedTeamNames?.length > 0 && (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.75 }}>
+                      {notif.selectedTeamNames.map(name => (
+                        <Chip key={name} label={name} size="small"
+                          icon={<GroupsIcon sx={{ fontSize: '10px !important' }} />}
+                          sx={{ height: 18, ...fTiny, fontWeight: 600 }} />
+                      ))}
+                    </Box>
+                  )}
+
                   {/* Channel + frequency info */}
                   <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75 }}>
                     {notif.channels?.teams && (
@@ -173,6 +185,17 @@ export default function NotificationDrawer({ open, onClose, viewId, viewName }) 
                         <EmailIcon sx={{ fontSize: 12, color: '#EA4335' }} />
                         <Typography sx={fTiny} color="text.secondary">
                           Email{notif.emailRecipients?.length ? ` (${notif.emailRecipients.length})` : ''}
+                        </Typography>
+                      </Box>
+                    )}
+                    {notif.channels?.teamRoles && notif.teamRoles?.length > 0 && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                        <BadgeIcon sx={{ fontSize: 12, color: '#a855f7' }} />
+                        <Typography sx={fTiny} color="text.secondary">
+                          Roles ({notif.teamRoles.length})
+                          {notif.roleMode === 'pick' && notif.roleMembers?.length > 0
+                            ? ` · ${notif.roleMembers.length} picked`
+                            : ''}
                         </Typography>
                       </Box>
                     )}

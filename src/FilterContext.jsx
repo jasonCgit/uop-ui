@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useMemo, useCallback, useEffect } from 'react'
+import { createContext, useContext, useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { APPS, parseSealDisplay, parseDeployDisplay, SEAL_DISPLAY } from './data/appData'
 import { useTenant } from './tenant/TenantContext'
 import { loadProfile } from './utils/profileStorage'
@@ -35,6 +36,39 @@ function saveFilterState(tenantId, searchText, activeFilters) {
   }))
 }
 
+// All recognised filter keys for URL param sync
+const FILTER_KEYS = new Set([
+  'lob', 'subLob', 'productLine', 'product',
+  'cto', 'cbt', 'appOwner', 'seal',
+  'cpof', 'riskRanking', 'classification', 'state',
+  'investmentStrategy', 'rto', 'deployments',
+])
+
+function parseUrlFilters(searchParams) {
+  const activeFilters = {}
+  let hasAny = false
+  for (const key of FILTER_KEYS) {
+    const values = searchParams.getAll(key)
+    if (values.length > 0) {
+      activeFilters[key] = values
+      hasAny = true
+    }
+  }
+  const searchText = searchParams.get('search') || ''
+  if (!hasAny && !searchText) return null
+  return { searchText, activeFilters }
+}
+
+function filtersToSearchParams(searchText, activeFilters) {
+  const params = new URLSearchParams()
+  for (const key of FILTER_KEYS) {
+    const values = activeFilters[key] || []
+    for (const v of values) params.append(key, v)
+  }
+  if (searchText) params.set('search', searchText)
+  return params
+}
+
 // Shared filter-match logic used by both filteredApps and getCandidateApps
 function appMatchesFilters(app, searchText, activeFilters, excludeKey = null) {
   if (searchText) {
@@ -60,26 +94,52 @@ function appMatchesFilters(app, searchText, activeFilters, excludeKey = null) {
 
 export function FilterProvider({ children }) {
   const { tenant } = useTenant()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const skipUrlSync = useRef(false)
+
   const [searchText, setSearchText] = useState(() => {
+    const fromUrl = parseUrlFilters(searchParams)
+    if (fromUrl) return fromUrl.searchText
     const saved = loadFilterState(tenant.id)
     return saved?.searchText ?? ''
   })
   const [activeFilters, setActiveFilters] = useState(() => {
+    const fromUrl = parseUrlFilters(searchParams)
+    if (fromUrl) return fromUrl.activeFilters
     const saved = loadFilterState(tenant.id)
     return saved?.activeFilters ?? getEffectiveDefaults(tenant)
   })
 
   // Reset filters when tenant changes
   useEffect(() => {
+    skipUrlSync.current = true
     setActiveFilters(getEffectiveDefaults(tenant))
     setSearchText('')
     sessionStorage.removeItem(SS_FILTER_KEY)
-  }, [tenant.id])
+    setSearchParams(prev => {
+      const next = new URLSearchParams()
+      for (const [key, value] of prev.entries()) {
+        if (!FILTER_KEYS.has(key) && key !== 'search') next.append(key, value)
+      }
+      return next
+    }, { replace: true })
+    skipUrlSync.current = false
+  }, [tenant.id])                           // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persist filter state to sessionStorage
+  // Persist filter state to sessionStorage + URL
   useEffect(() => {
     saveFilterState(tenant.id, searchText, activeFilters)
-  }, [tenant.id, searchText, activeFilters])
+    if (skipUrlSync.current) return
+    setSearchParams(prev => {
+      const next = new URLSearchParams()
+      for (const [key, value] of prev.entries()) {
+        if (!FILTER_KEYS.has(key) && key !== 'search') next.append(key, value)
+      }
+      const fp = filtersToSearchParams(searchText, activeFilters)
+      for (const [key, value] of fp.entries()) next.append(key, value)
+      return next
+    }, { replace: true })
+  }, [tenant.id, searchText, activeFilters]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setFilterValues = useCallback((key, values) => {
     setActiveFilters(prev => {
@@ -127,35 +187,31 @@ export function FilterProvider({ children }) {
     const q = searchText.toLowerCase()
     const suggestions = []
     const seen = new Set()
-    // [displayLabel, appProperty, filterKey, source]
+    // [displayLabel, appProperty, filterKey]
     const fields = [
-      // PATOOLS — Business hierarchy
-      ['App',          'name',        'seal',        'patools'],
-      ['SEAL',         'seal',        'seal',        'patools'],
-      ['LOB',          'lob',         'lob',         'patools'],
-      ['Sub LOB',      'subLob',      'subLob',      'patools'],
-      ['Product Line', 'productLine', 'productLine', 'patools'],
-      ['Product',      'product',     'product',     'patools'],
-      // V12 — Technology hierarchy
-      ['CTO',          'cto',         'cto',         'v12'],
-      ['CBT',          'cbt',         'cbt',         'v12'],
-      // Other
-      ['Owner',        'appOwner',    'appOwner',    null],
-      ['Team',         'team',        null,          null],
+      ['App',          'name',        'seal'],
+      ['SEAL',         'seal',        'seal'],
+      ['LOB',          'lob',         'lob'],
+      ['Sub LOB',      'subLob',      'subLob'],
+      ['Product Line', 'productLine', 'productLine'],
+      ['Product',      'product',     'product'],
+      ['CTO',          'cto',         'cto'],
+      ['CBT',          'cbt',         'cbt'],
+      ['Owner',        'appOwner',    'appOwner'],
+      ['Team',         'team',        null],
     ]
     for (const app of APPS) {
-      for (const [fieldLabel, fieldKey, filterKey, source] of fields) {
+      for (const [fieldLabel, fieldKey, filterKey] of fields) {
         const value = app[fieldKey]
         if (value && value.toLowerCase().includes(q) && !seen.has(`${fieldKey}:${value}`)) {
           seen.add(`${fieldKey}:${value}`)
-          // For name/seal fields, the filter value is the SEAL display string
           let filterValue = value
           if (filterKey === 'seal' && fieldKey === 'name') {
             filterValue = SEAL_DISPLAY[app.seal] || app.seal
           } else if (filterKey === 'seal' && fieldKey === 'seal') {
             filterValue = SEAL_DISPLAY[value] || value
           }
-          suggestions.push({ field: fieldLabel, value, filterKey, filterValue, source })
+          suggestions.push({ field: fieldLabel, value, filterKey, filterValue })
         }
       }
     }

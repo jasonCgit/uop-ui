@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Box, Typography, CircularProgress, Breadcrumbs, Link,
   TextField, InputAdornment, Button, ButtonGroup, IconButton, Tooltip,
@@ -27,13 +28,20 @@ function loadSavedState() {
 
 export default function Applications() {
   const { filteredApps, activeFilterCount, totalApps, clearAllFilters } = useFilters()
+  const [searchParams, setSearchParams] = useSearchParams()
   const saved = useRef(loadSavedState())
   const [statusFilter, setStatusFilter] = useState(() => {
+    const fromUrl = searchParams.getAll('status')
+    if (fromUrl.length > 0) return fromUrl
     const sf = saved.current?.statusFilter
     return Array.isArray(sf) ? sf : (sf && sf !== 'all' ? [sf] : [])
   })
-  const [selectedPath, setSelectedPath] = useState(saved.current?.selectedPath || 'all')
-  const [treeMode, setTreeMode] = useState(saved.current?.treeMode || 'technology')
+  const [selectedPath, setSelectedPath] = useState(() =>
+    searchParams.get('path') || saved.current?.selectedPath || 'all'
+  )
+  const [treeMode, setTreeMode] = useState(() =>
+    searchParams.get('tree') || saved.current?.treeMode || 'technology'
+  )
   const [selectedApps, setSelectedApps] = useState(null) // null = show all
   const [enrichedMap, setEnrichedMap] = useState({})       // slug → enriched data
   const [loading, setLoading] = useState(true)
@@ -41,7 +49,9 @@ export default function Applications() {
   const [appFilter, setAppFilter] = useState(saved.current?.appFilter || '')
   const tableRef = useRef(null)
   const [, forceUpdate] = useState(0)
-  const [viewMode, setViewMode] = useState(() => sessionStorage.getItem('apps-view-mode') || 'cards')
+  const [viewMode, setViewMode] = useState(() =>
+    searchParams.get('view') || sessionStorage.getItem('apps-view-mode') || 'cards'
+  )
   const [cardsAllExpanded, setCardsAllExpanded] = useState(() => sessionStorage.getItem('apps-cards-expanded') === 'true')
 
   // Full-viewport height calc
@@ -90,6 +100,19 @@ export default function Applications() {
   useEffect(() => {
     sessionStorage.setItem(SS_KEY, JSON.stringify({ statusFilter, selectedPath, treeMode }))
   }, [statusFilter, selectedPath, treeMode])
+
+  // Sync page-specific state to URL params
+  useEffect(() => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.delete('status'); next.delete('path'); next.delete('tree'); next.delete('view')
+      statusFilter.forEach(s => next.append('status', s))
+      if (selectedPath !== 'all') next.set('path', selectedPath)
+      if (treeMode !== 'technology') next.set('tree', treeMode)
+      if (viewMode !== 'cards') next.set('view', viewMode)
+      return next
+    }, { replace: true })
+  }, [statusFilter, selectedPath, treeMode, viewMode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Restore scroll position after data loads
   useEffect(() => {

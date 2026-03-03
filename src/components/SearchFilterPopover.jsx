@@ -65,21 +65,21 @@ export default function SearchFilterPopover({ anchorEl, open, onClose }) {
     const suggestions = []
     const seen = new Set()
     const fields = [
-      ['App', 'name', 'seal', 'patools'], ['SEAL', 'seal', 'seal', 'patools'],
-      ['LOB', 'lob', 'lob', 'patools'], ['Sub LOB', 'subLob', 'subLob', 'patools'],
-      ['Product Line', 'productLine', 'productLine', 'patools'], ['Product', 'product', 'product', 'patools'],
-      ['CTO', 'cto', 'cto', 'v12'], ['CBT', 'cbt', 'cbt', 'v12'],
-      ['Owner', 'appOwner', 'appOwner', null], ['Team', 'team', null, null],
+      ['App', 'name', 'seal'], ['SEAL', 'seal', 'seal'],
+      ['LOB', 'lob', 'lob'], ['Sub LOB', 'subLob', 'subLob'],
+      ['Product Line', 'productLine', 'productLine'], ['Product', 'product', 'product'],
+      ['CTO', 'cto', 'cto'], ['CBT', 'cbt', 'cbt'],
+      ['Owner', 'appOwner', 'appOwner'], ['Team', 'team', null],
     ]
     for (const app of APPS) {
-      for (const [fieldLabel, fieldKey, filterKey, source] of fields) {
+      for (const [fieldLabel, fieldKey, filterKey] of fields) {
         const value = app[fieldKey]
         if (value && value.toLowerCase().includes(q) && !seen.has(`${fieldKey}:${value}`)) {
           seen.add(`${fieldKey}:${value}`)
           let filterValue = value
           if (filterKey === 'seal' && fieldKey === 'name') filterValue = SEAL_DISPLAY[app.seal] || app.seal
           else if (filterKey === 'seal' && fieldKey === 'seal') filterValue = SEAL_DISPLAY[value] || value
-          suggestions.push({ field: fieldLabel, value, filterKey, filterValue, source })
+          suggestions.push({ field: fieldLabel, value, filterKey, filterValue })
         }
       }
     }
@@ -231,12 +231,6 @@ export default function SearchFilterPopover({ anchorEl, open, onClose }) {
               <li key={liKey} {...rest} style={{ ...rest.style, padding: '4px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
                 <Typography sx={{ ...fTiny, color: 'text.disabled', minWidth: 55 }}>{opt.field}</Typography>
                 <Typography sx={{ ...fSmall, fontWeight: 600, flex: 1 }} noWrap>{opt.value}</Typography>
-                {opt.source && (
-                  <Typography sx={{ ...fTiny, color: opt.source === 'v12' ? 'rgba(96,165,250,0.6)' : 'rgba(168,85,247,0.6)',
-                    fontWeight: 600, fontSize: '0.55rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                    {opt.source === 'v12' ? 'V12' : 'PAT'}
-                  </Typography>
-                )}
               </li>
             )
           }}
@@ -313,7 +307,7 @@ export default function SearchFilterPopover({ anchorEl, open, onClose }) {
           <Typography
             onClick={draftClearAll}
             sx={{
-              ml: 'auto', ...fTiny, color: 'primary.main', cursor: 'pointer', fontWeight: 600,
+              ml: 'auto', ...fTiny, color: 'primary.main', cursor: 'pointer', fontWeight: 600, lineHeight: '22px',
               '&:hover': { textDecoration: 'underline' },
             }}
           >

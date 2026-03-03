@@ -59,30 +59,34 @@ class ErrorBoundary extends Component {
 export default function App() {
   return (
     <ErrorBoundary>
-      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-        <TopNav />
-        <ScopeBar />
-        <Routes>
-          <Route path="/"                element={<Dashboard />} />
-          <Route path="/graph-layers"    element={<GraphLayers />} />
-          <Route path="/graph"           element={<Navigate to="/graph-layers" replace />} />
-          <Route path="/applications"    element={<Applications />} />
-          <Route path="/favorites"       element={<Favorites />} />
-          <Route path="/view-central"    element={<ViewCentralListing />} />
-          <Route path="/view-central/:id" element={<ViewCentralDashboard />} />
-          <Route path="/customer-journey" element={<CustomerJourney />} />
-          <Route path="/slo-agent"       element={<SloAgent />} />
-          <Route path="/incident-zero"   element={<IncidentZero />} />
-          <Route path="/announcements"   element={<Announcements />} />
-          <Route path="/links"           element={<Links />} />
-          <Route path="/teams"           element={<Teams />} />
-          <Route path="/profile"         element={<ProfilePage />} />
-          <Route path="/portals"         element={<Admin />} />
-          <Route path="/admin"           element={<Navigate to="/portals" replace />} />
-          <Route path="/views"           element={<Navigate to="/view-central" replace />} />
-          <Route path="*"                element={<Navigate to="/" replace />} />
-        </Routes>
-        <AuraChatFab />
+      <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: 'background.default', overflow: 'hidden' }}>
+        <Box sx={{ position: 'sticky', top: 0, zIndex: (t) => t.zIndex.appBar, bgcolor: 'background.default', flexShrink: 0 }}>
+          <TopNav />
+          <ScopeBar />
+        </Box>
+        <Box sx={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+          <Routes>
+            <Route path="/"                element={<Dashboard />} />
+            <Route path="/graph-layers"    element={<GraphLayers />} />
+            <Route path="/graph"           element={<Navigate to="/graph-layers" replace />} />
+            <Route path="/applications"    element={<Applications />} />
+            <Route path="/favorites"       element={<Favorites />} />
+            <Route path="/view-central"    element={<ViewCentralListing />} />
+            <Route path="/view-central/:id" element={<ViewCentralDashboard />} />
+            <Route path="/customer-journey" element={<CustomerJourney />} />
+            <Route path="/slo-agent"       element={<SloAgent />} />
+            <Route path="/incident-zero"   element={<IncidentZero />} />
+            <Route path="/announcements"   element={<Announcements />} />
+            <Route path="/links"           element={<Links />} />
+            <Route path="/teams"           element={<Teams />} />
+            <Route path="/profile"         element={<ProfilePage />} />
+            <Route path="/portals"         element={<Admin />} />
+            <Route path="/admin"           element={<Navigate to="/portals" replace />} />
+            <Route path="/views"           element={<Navigate to="/view-central" replace />} />
+            <Route path="*"                element={<Navigate to="/" replace />} />
+          </Routes>
+          <AuraChatFab />
+        </Box>
       </Box>
     </ErrorBoundary>
   )

@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Box, Chip, Typography, Tooltip, IconButton, Badge } from '@mui/material'
-import FilterListIcon from '@mui/icons-material/FilterList'
+import { Box, Chip, Typography, Tooltip, IconButton } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
-import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import VisibilityIcon from '@mui/icons-material/Visibility'
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import { useFilters } from '../FilterContext'
 import { FILTER_FIELDS } from '../data/appData'
-import SearchFilterPopover from './SearchFilterPopover'
 
 const fSmall = { fontSize: 'clamp(0.6rem, 0.8vw, 0.7rem)' }
 
@@ -32,54 +30,42 @@ export default function ScopeBar() {
   const [hidden, setHidden] = useState(false)
   const [revealed, setRevealed] = useState(false)
   const hideTimerRef = useRef(null)
-  const [searchAnchor, setSearchAnchor] = useState(null)
 
   const hasScope = activeFilterCount > 0 || searchText.length > 0
+  const showBar = !hidden || revealed
 
-  const startAutoHide = useCallback(() => {
+  const handleMouseMove = () => {
+    if (!hidden) return
     clearTimeout(hideTimerRef.current)
-    hideTimerRef.current = setTimeout(() => setRevealed(false), 10000)
-  }, [])
-
-  const handleMouseEnter = () => {
-    if (hidden && !revealed) {
+    if (!revealed) {
       setRevealed(true)
-      startAutoHide()
-    }
-    if (hidden && revealed) {
-      startAutoHide()
+    } else {
+      // Keep alive while mouse is moving; auto-hide after inactivity
+      hideTimerRef.current = setTimeout(() => setRevealed(false), 5000)
     }
   }
 
-  const handleMouseLeave = () => {}
+  const handleMouseLeave = () => {
+    if (hidden) {
+      hideTimerRef.current = setTimeout(() => setRevealed(false), 5000)
+    }
+  }
 
+  // Click anywhere outside → hide immediately
   useEffect(() => {
-    if (!(hidden && revealed)) return
-    const handler = (e) => {
+    if (!hidden || !revealed) return
+    const handleClickOutside = (e) => {
       const bar = document.getElementById('scope-bar')
       if (bar && !bar.contains(e.target)) {
         clearTimeout(hideTimerRef.current)
         setRevealed(false)
       }
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [hidden, revealed])
 
-  const prevFilterCountRef = useRef(activeFilterCount)
-  useEffect(() => {
-    if (activeFilterCount !== prevFilterCountRef.current) {
-      prevFilterCountRef.current = activeFilterCount
-      if (hidden && activeFilterCount > 0) {
-        setRevealed(true)
-        startAutoHide()
-      }
-    }
-  }, [activeFilterCount, hidden, startAutoHide])
-
   useEffect(() => () => clearTimeout(hideTimerRef.current), [])
-
-  const showBar = !hidden || revealed
 
   // Flat list of active filter chips
   const activeChips = []
@@ -134,61 +120,36 @@ export default function ScopeBar() {
   return (
     <Box
       id="scope-bar"
-      onMouseEnter={handleMouseEnter}
+      onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       sx={{
-        position: 'sticky',
-        top: 56,
-        zIndex: (t) => t.zIndex.appBar - 1,
-        bgcolor: 'background.default',
         overflow: 'hidden',
-        maxHeight: showBar ? 40 : 3,
-        transition: 'max-height 0.25s ease-in-out',
-        borderBottom: '1px solid',
+        height: showBar ? 40 : 4,
+        transition: 'height 0.25s ease-in-out',
+        borderBottom: showBar ? '1px solid' : 'none',
         borderColor: 'divider',
+        flexShrink: 0,
         cursor: !showBar ? 'pointer' : 'default',
         ...(!showBar && {
-          bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(96,165,250,0.2)' : 'rgba(21,101,192,0.15)',
+          bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)',
+          '&:hover': {
+            bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.3)',
+          },
         }),
       }}
     >
       <Box sx={{
-        display: 'flex', alignItems: 'center',
+        display: 'flex', alignItems: 'center', height: 40,
         bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(21,101,192,0.06)' : 'rgba(21,101,192,0.03)',
       }}>
-        {/* Left pinned: filter icon */}
-        <Box sx={{ display: 'flex', alignItems: 'center', pl: 2, py: 0.5, flexShrink: 0 }}>
-          <Badge
-            badgeContent={activeFilterCount}
-            color="primary"
-            max={99}
-            sx={{
-              '& .MuiBadge-badge': {
-                fontSize: 9, height: 14, minWidth: 14, p: '0 3px',
-                display: activeFilterCount > 0 ? 'flex' : 'none',
-              },
-            }}
-          >
-            <FilterListIcon
-              onClick={(e) => setSearchAnchor(e.currentTarget)}
-              sx={{ fontSize: 16, color: hasScope ? 'primary.main' : 'text.disabled', cursor: 'pointer', '&:hover': { color: 'text.secondary' } }}
-            />
-          </Badge>
-          <SearchFilterPopover
-            anchorEl={searchAnchor}
-            open={Boolean(searchAnchor)}
-            onClose={() => setSearchAnchor(null)}
-          />
-        </Box>
-
-        {/* Middle: scrollable / draggable chips area */}
+        {/* Scrollable / draggable chips area */}
         <Box
           ref={chipsRef}
           onMouseDown={handleDragStart}
           sx={{
             flex: 1, minWidth: 0,
             display: 'flex', alignItems: 'center', gap: 0.5,
-            px: 1, py: 0.5,
+            pl: 2, pr: 1, py: 0.5,
             overflowX: 'auto',
             cursor: activeChips.length > 0 || searchText ? 'grab' : 'default',
             '&::-webkit-scrollbar': { display: 'none' },
@@ -251,24 +212,18 @@ export default function ScopeBar() {
             </Typography>
           )}
 
-          {/* Hide / Show toggle */}
-          <Tooltip title={hidden ? 'Keep bar visible' : 'Hide bar'} placement="bottom">
+          {/* Hide / Keep visible toggle */}
+          <Tooltip title={hidden ? 'Keep bar visible' : 'Hide bar'}>
             <IconButton
               size="small"
               onClick={() => {
                 if (hidden) {
-                  setHidden(false)
-                  setRevealed(false)
-                  clearTimeout(hideTimerRef.current)
+                  setHidden(false); setRevealed(false); clearTimeout(hideTimerRef.current)
                 } else {
-                  setHidden(true)
+                  setHidden(true); setRevealed(false); clearTimeout(hideTimerRef.current)
                 }
               }}
-              sx={{
-                p: 0.25, ml: 0.5,
-                color: 'text.disabled',
-                '&:hover': { color: 'text.secondary' },
-              }}
+              sx={{ p: 0.25, ml: 0.5, color: 'text.disabled', '&:hover': { color: 'text.secondary' } }}
             >
               {hidden
                 ? <VisibilityIcon sx={{ fontSize: 14 }} />

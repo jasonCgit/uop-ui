@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTheme } from '@mui/material/styles'
 import {
   Container, Typography, Box, Card, CardContent, Chip, Divider,
@@ -177,10 +178,11 @@ function SectionHeader({ children }) {
 export default function Announcements() {
   const theme = useTheme()
   const isDark = theme.palette.mode === 'dark'
+  const [searchParams, setSearchParams] = useSearchParams()
   const [data, setData]             = useState([])
-  const [filter, setFilter]         = useState('all')
-  const [search, setSearch]         = useState('')
-  const [showClosed, setShowClosed] = useState(false)
+  const [filter, setFilter]         = useState(() => searchParams.get('channel') || 'all')
+  const [search, setSearch]         = useState(() => searchParams.get('q') || '')
+  const [showClosed, setShowClosed] = useState(() => searchParams.get('closed') === 'true')
   const [loading, setLoading]       = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId]   = useState(null)
@@ -222,6 +224,23 @@ export default function Announcements() {
       .then(setManagedTeams)
       .catch(() => {})
   }, [])
+
+  // Sync page-specific state to URL params
+  const searchDebounceRef = useRef(null)
+  useEffect(() => {
+    clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev)
+        next.delete('channel'); next.delete('q'); next.delete('closed')
+        if (filter !== 'all') next.set('channel', filter)
+        if (search) next.set('q', search)
+        if (showClosed) next.set('closed', 'true')
+        return next
+      }, { replace: true })
+    }, search !== (searchParams.get('q') || '') ? 300 : 0)
+    return () => clearTimeout(searchDebounceRef.current)
+  }, [filter, search, showClosed]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Derive available channels and emails from selected teams
   const availableChannelsFromTeams = useMemo(() => {
@@ -854,15 +873,15 @@ export default function Announcements() {
                   <Typography variant="caption" sx={{ fontSize: '0.72rem', color: 'text.secondary', mb: 0.5, display: 'block', fontWeight: 600 }}>
                     Please select user interface(s) with WEAVE function
                   </Typography>
-                  <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 240, bgcolor: 'background.default' }}>
+                  <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 240, bgcolor: 'background.paper' }}>
                     <Table size="small" stickyHeader>
                       <TableHead>
                         <TableRow>
-                          <TableCell padding="checkbox" sx={{ bgcolor: 'background.default' }} />
-                          <TableCell sx={{ fontSize: '0.72rem', fontWeight: 700, bgcolor: 'background.default' }}>User Interface Title</TableCell>
-                          <TableCell sx={{ fontSize: '0.72rem', fontWeight: 700, bgcolor: 'background.default' }}>User Interface Name</TableCell>
-                          <TableCell sx={{ fontSize: '0.72rem', fontWeight: 700, bgcolor: 'background.default' }}>WEAVE Function</TableCell>
-                          <TableCell sx={{ fontSize: '0.72rem', fontWeight: 700, bgcolor: 'background.default' }}>SEAL ID</TableCell>
+                          <TableCell padding="checkbox" sx={{ bgcolor: 'background.paper' }} />
+                          <TableCell sx={{ fontSize: '0.72rem', fontWeight: 700, bgcolor: 'background.paper' }}>User Interface Title</TableCell>
+                          <TableCell sx={{ fontSize: '0.72rem', fontWeight: 700, bgcolor: 'background.paper' }}>User Interface Name</TableCell>
+                          <TableCell sx={{ fontSize: '0.72rem', fontWeight: 700, bgcolor: 'background.paper' }}>WEAVE Function</TableCell>
+                          <TableCell sx={{ fontSize: '0.72rem', fontWeight: 700, bgcolor: 'background.paper' }}>SEAL ID</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>

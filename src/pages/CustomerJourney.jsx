@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Container, Typography, Box, Card, CardContent,
   Chip, Grid, Divider, LinearProgress, ToggleButtonGroup, ToggleButton,
@@ -37,10 +38,19 @@ const JOURNEYS = {
 }
 
 export default function CustomerJourney() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [activeJourney, setActiveJourney] = useState(() =>
-    sessionStorage.getItem('cj-active-journey') || 'Trade Execution'
+    searchParams.get('journey') || sessionStorage.getItem('cj-active-journey') || 'Trade Execution'
   )
-  useEffect(() => { sessionStorage.setItem('cj-active-journey', activeJourney) }, [activeJourney])
+  useEffect(() => {
+    sessionStorage.setItem('cj-active-journey', activeJourney)
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.delete('journey')
+      if (activeJourney !== 'Trade Execution') next.set('journey', activeJourney)
+      return next
+    }, { replace: true })
+  }, [activeJourney]) // eslint-disable-line react-hooks/exhaustive-deps
   const steps = JOURNEYS[activeJourney]
   const overallStatus = steps.some(s => s.status === 'critical') ? 'critical' : steps.some(s => s.status === 'warning') ? 'warning' : 'healthy'
 

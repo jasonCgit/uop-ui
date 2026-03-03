@@ -12,6 +12,8 @@ import SettingsIcon from '@mui/icons-material/Settings'
 import WidgetsIcon from '@mui/icons-material/Widgets'
 import RestartAltIcon from '@mui/icons-material/RestartAlt'
 import NotificationsIcon from '@mui/icons-material/Notifications'
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
+import VisibilityIcon from '@mui/icons-material/Visibility'
 import { useNavigate, useParams } from 'react-router-dom'
 import { loadViewCentral, saveViewCentral, generateWidgetId, resetViewToDefault, DEFAULT_VIEW_CENTRALS } from './viewCentralStorage'
 import { WIDGET_REGISTRY } from './widgetRegistry'
@@ -37,21 +39,22 @@ export default function ViewCentralDashboard() {
   const [resetConfirm, setResetConfirm] = useState(false)
   const [notifDrawerOpen, setNotifDrawerOpen] = useState(false)
   const [headerVisible, setHeaderVisible] = useState(true)
-  const hideTimer = useRef(null)
+  const [headerRevealed, setHeaderRevealed] = useState(false)
+  const headerHideTimer = useRef(null)
 
-  const showHeader = useCallback(() => {
-    setHeaderVisible(true)
-    clearTimeout(hideTimer.current)
-    hideTimer.current = setTimeout(() => setHeaderVisible(false), 5000)
-  }, [])
-
-  const keepHeader = useCallback(() => {
-    clearTimeout(hideTimer.current)
-  }, [])
-
-  const leaveHeader = useCallback(() => {
-    hideTimer.current = setTimeout(() => setHeaderVisible(false), 5000)
-  }, [])
+  // Click anywhere outside header → hide immediately
+  useEffect(() => {
+    if (headerVisible || !headerRevealed) return
+    const handleClickOutside = (e) => {
+      const bar = document.getElementById('vc-header-bar')
+      if (bar && !bar.contains(e.target)) {
+        clearTimeout(headerHideTimer.current)
+        setHeaderRevealed(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [headerVisible, headerRevealed])
 
   useEffect(() => {
     const loaded = loadViewCentral(id)
@@ -59,11 +62,6 @@ export default function ViewCentralDashboard() {
     setView(loaded)
   }, [id, navigate])
 
-  // Auto-hide header 5s after mount
-  useEffect(() => {
-    hideTimer.current = setTimeout(() => setHeaderVisible(false), 5000)
-    return () => clearTimeout(hideTimer.current)
-  }, [])
 
   const persist = useCallback((updated) => {
     setView(updated)
@@ -168,34 +166,46 @@ export default function ViewCentralDashboard() {
   const hasWidgets = view.widgets.length > 0
 
   return (
-    <Box sx={{ height: 'calc(100vh - 56px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
-      {/* Hover trigger zone */}
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+      {/* Header bar — toggleable via hide/show button */}
       <Box
-        onMouseEnter={showHeader}
-        sx={{
-          position: 'absolute',
-          top: 0, left: 0, right: 0,
-          height: headerVisible ? 0 : 6,
-          zIndex: 20,
-          cursor: 'default',
+        id="vc-header-bar"
+        onMouseMove={() => {
+          if (headerVisible) return
+          clearTimeout(headerHideTimer.current)
+          if (!headerRevealed) {
+            setHeaderRevealed(true)
+          } else {
+            headerHideTimer.current = setTimeout(() => setHeaderRevealed(false), 5000)
+          }
         }}
-      />
-      {/* Header bar — auto-hides after 5s, pauses on hover, restarts on leave */}
+        onMouseLeave={() => {
+          if (!headerVisible) {
+            headerHideTimer.current = setTimeout(() => setHeaderRevealed(false), 5000)
+          }
+        }}
+        sx={{
+          overflow: 'hidden',
+          height: (headerVisible || headerRevealed) ? 'auto' : 4,
+          transition: 'height 0.25s ease-in-out',
+          borderBottom: (headerVisible || headerRevealed) ? '1px solid' : 'none',
+          borderColor: 'divider',
+          flexShrink: 0,
+          cursor: (!headerVisible && !headerRevealed) ? 'pointer' : 'default',
+          ...(!headerVisible && !headerRevealed && {
+            bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)',
+            '&:hover': {
+              bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.3)',
+            },
+          }),
+        }}
+      >
       <Box
-        onMouseEnter={keepHeader}
-        onMouseLeave={leaveHeader}
         sx={{
           px: { xs: 1.5, sm: 2.5 }, py: 1,
-          borderBottom: '1px solid', borderColor: 'divider',
           display: 'flex', alignItems: 'center', gap: 1.5,
           bgcolor: 'background.paper', flexShrink: 0,
           flexWrap: 'wrap',
-          position: 'absolute',
-          top: 0, left: 0, right: 0,
-          zIndex: 20,
-          transform: headerVisible ? 'translateY(0)' : 'translateY(-100%)',
-          transition: 'transform 0.3s ease-in-out',
-          boxShadow: headerVisible ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
         }}
       >
         <Tooltip title="Back to View Central">
@@ -252,7 +262,19 @@ export default function ViewCentralDashboard() {
               <SettingsIcon sx={{ fontSize: 18 }} />
             </IconButton>
           </Tooltip>
+          <Tooltip title={headerVisible ? 'Hide bar' : 'Keep bar visible'}>
+            <IconButton size="small" onClick={() => {
+              if (headerVisible) {
+                setHeaderVisible(false); setHeaderRevealed(false); clearTimeout(headerHideTimer.current)
+              } else {
+                setHeaderVisible(true); setHeaderRevealed(false); clearTimeout(headerHideTimer.current)
+              }
+            }} sx={{ p: 0.5, color: 'text.disabled', '&:hover': { color: 'text.secondary' } }}>
+              {headerVisible ? <VisibilityOffIcon sx={{ fontSize: 16 }} /> : <VisibilityIcon sx={{ fontSize: 16 }} />}
+            </IconButton>
+          </Tooltip>
         </Stack>
+      </Box>
       </Box>
 
       {/* Grid area */}

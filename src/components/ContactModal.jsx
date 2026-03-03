@@ -8,6 +8,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close'
 import EmailIcon from '@mui/icons-material/Email'
 import GroupsIcon from '@mui/icons-material/Groups'
+import PersonIcon from '@mui/icons-material/Person'
 import SendIcon from '@mui/icons-material/Send'
 const ReactQuill = lazy(() => import('react-quill'))
 import 'react-quill/dist/quill.snow.css'
@@ -95,8 +96,10 @@ export default function ContactModal({ app, team, teams: teamsProp, onClose }) {
 
   // Fetch all managed teams so user can add more
   const [allTeams, setAllTeams] = useState([])
+  const [roles, setRoles] = useState([])
   useEffect(() => {
     fetch(`${API_URL}/api/teams`).then(r => r.json()).then(setAllTeams).catch(() => {})
+    fetch(`${API_URL}/api/teams/roles`).then(r => r.json()).then(setRoles).catch(() => {})
   }, [])
 
   // Channel toggles
@@ -112,6 +115,7 @@ export default function ContactModal({ app, team, teams: teamsProp, onClose }) {
   const [toEmails, setToEmails] = useState([])
   const [emailBody, setEmailBody] = useState('')
   const [subject, setSubject] = useState(app ? `Regarding ${app.name}` : '')
+  const [roleFilter, setRoleFilter] = useState('all')
 
   // Shared
   const [message, setMessage] = useState('')
@@ -125,12 +129,27 @@ export default function ContactModal({ app, team, teams: teamsProp, onClose }) {
     return [...set]
   }, [selectedTeamsForChannels])
 
-  // Derive available emails from selected teams
-  const availableEmails = useMemo(() => {
+  // Derive available emails: group emails + member emails (filtered by role)
+  const availableGroupEmails = useMemo(() => {
     const set = new Set()
     selectedTeamsForEmail.forEach(t => t.emails?.forEach(e => set.add(e)))
     return [...set]
   }, [selectedTeamsForEmail])
+
+  const availableMemberEmails = useMemo(() => {
+    const set = new Set()
+    selectedTeamsForEmail.forEach(t => {
+      const members = t.members || []
+      const filtered = roleFilter === 'all' ? members : members.filter(m => m.role === roleFilter)
+      filtered.forEach(m => set.add(m.email))
+    })
+    return [...set]
+  }, [selectedTeamsForEmail, roleFilter])
+
+  const availableEmails = useMemo(() => {
+    const set = new Set([...availableGroupEmails, ...availableMemberEmails])
+    return [...set]
+  }, [availableGroupEmails, availableMemberEmails])
 
   // Auto-select all channels when teams change
   useEffect(() => {
@@ -324,19 +343,14 @@ export default function ContactModal({ app, team, teams: teamsProp, onClose }) {
                       options={allTeams.length > 0 ? allTeams : teamsList}
                       getOptionLabel={t => t.name}
                       value={selectedTeamsForEmail}
-                      onChange={(_, v) => {
-                        setSelectedTeamsForEmail(v)
-                        const allEmails = new Set()
-                        v.forEach(t => t.emails?.forEach(e => allEmails.add(e)))
-                        setToEmails([...allEmails])
-                      }}
+                      onChange={(_, v) => setSelectedTeamsForEmail(v)}
                       isOptionEqualToValue={(opt, val) => opt.id === val.id}
                       renderOption={(props, option, { selected }) => (
                         <li {...props}><Checkbox size="small" checked={selected} sx={{ mr: 1 }} />
                           <Box>
                             <Typography sx={{ fontSize: '0.78rem', fontWeight: 600 }}>{option.name}</Typography>
                             <Typography sx={{ fontSize: '0.66rem', color: 'text.secondary' }}>
-                              {option.emails?.length || 0} emails
+                              {option.emails?.length || 0} group emails · {option.members?.length || 0} members
                             </Typography>
                           </Box>
                         </li>
@@ -352,22 +366,62 @@ export default function ContactModal({ app, team, teams: teamsProp, onClose }) {
                           InputLabelProps={{ sx: labelSx }} InputProps={{ ...params.InputProps, sx: { ...fieldSx, flexWrap: 'wrap' } }} />
                       )}
                     />
+
+                    {/* Role filter */}
+                    {selectedTeamsForEmail.some(t => t.members?.length > 0) && (
+                      <Box>
+                        <Typography variant="caption" sx={{ fontSize: '0.68rem', color: 'text.secondary', mb: 0.5, display: 'block' }}>
+                          Filter members by role
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                          <Chip label="All" size="small"
+                            variant={roleFilter === 'all' ? 'filled' : 'outlined'}
+                            color={roleFilter === 'all' ? 'primary' : 'default'}
+                            onClick={() => setRoleFilter('all')}
+                            sx={{ height: 22, fontSize: '0.66rem' }} />
+                          {roles.map(r => {
+                            const count = selectedTeamsForEmail.reduce((n, t) => n + (t.members || []).filter(m => m.role === r).length, 0)
+                            return (
+                              <Chip key={r} label={`${r} (${count})`} size="small"
+                                variant={roleFilter === r ? 'filled' : 'outlined'}
+                                color={roleFilter === r ? 'primary' : 'default'}
+                                onClick={() => setRoleFilter(r)}
+                                sx={{ height: 22, fontSize: '0.66rem' }} />
+                            )
+                          })}
+                        </Box>
+                      </Box>
+                    )}
+
                     {/* Email recipients from selected teams */}
                     {availableEmails.length > 0 && (
                       <Autocomplete
                         multiple size="small" freeSolo disableCloseOnSelect
                         options={availableEmails}
+                        groupBy={email => availableMemberEmails.includes(email) && !availableGroupEmails.includes(email)
+                          ? 'Members' : availableGroupEmails.includes(email) ? 'Group' : 'Members'}
                         value={toEmails}
                         onChange={(_, v) => setToEmails(v)}
-                        renderOption={(props, option, { selected }) => (
-                          <li {...props}><Checkbox size="small" checked={selected} sx={{ mr: 1 }} />
-                            <Typography sx={{ fontSize: '0.78rem' }}>{option}</Typography></li>
-                        )}
+                        renderOption={(props, option, { selected }) => {
+                          const isMember = availableMemberEmails.includes(option)
+                          return (
+                            <li {...props}><Checkbox size="small" checked={selected} sx={{ mr: 1 }} />
+                              {isMember ? <PersonIcon sx={{ fontSize: 14, mr: 0.5, color: 'text.secondary' }} />
+                                : <EmailIcon sx={{ fontSize: 14, mr: 0.5, color: 'text.secondary' }} />}
+                              <Typography sx={{ fontSize: '0.78rem' }}>{option}</Typography></li>
+                          )
+                        }}
                         renderTags={(value, getTagProps) =>
-                          value.map((email, index) => (
-                            <Chip label={email} size="small" icon={<EmailIcon sx={{ fontSize: '12px !important' }} />}
-                              sx={{ height: 20, fontSize: '0.68rem' }} {...getTagProps({ index })} key={email} />
-                          ))
+                          value.map((email, index) => {
+                            const isMember = availableMemberEmails.includes(email)
+                            return (
+                              <Chip label={email} size="small"
+                                icon={isMember
+                                  ? <PersonIcon sx={{ fontSize: '12px !important' }} />
+                                  : <EmailIcon sx={{ fontSize: '12px !important' }} />}
+                                sx={{ height: 20, fontSize: '0.68rem' }} {...getTagProps({ index })} key={email} />
+                            )
+                          })
                         }
                         renderInput={params => (
                           <TextField {...params} label="Select Emails" placeholder="Pick emails or type custom..."

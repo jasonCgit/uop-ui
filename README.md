@@ -85,3 +85,16 @@ npm run dev
 ```
 
 Open `http://localhost:5174` in your browser.
+
+## URL Parameters
+
+Page state is synced to URL search params for shareable links:
+
+- **Global filters**: `?lob=AWM&seal=16649&search=Morgan` (managed by FilterContext)
+- **Applications**: `?status=critical&path=lob:Technology&tree=business&view=table`
+- **Blast Radius**: `?seal=88180&layers=crossapp,platform`
+- **Announcements**: `?channel=teams&q=maintenance&closed=true`
+- **Customer Journey**: `?journey=Client+Login`
+- **Teams / Favorites / View Central**: `?q=search+text`
+
+URL params coexist with global filters — page-specific params are preserved when filters change.

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Container, Typography, Box, Card, CardContent, CardActionArea,
   Grid, Chip, Stack, IconButton, Tooltip, TextField, InputAdornment,
@@ -8,7 +8,7 @@ import StarIcon from '@mui/icons-material/Star'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
 import WidgetsIcon from '@mui/icons-material/Widgets'
 import DashboardIcon from '@mui/icons-material/Dashboard'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   loadAllViewCentrals, saveViewCentral, toggleViewCentralFavorite,
   DEFAULT_VIEW_CENTRALS,
@@ -22,8 +22,9 @@ const sealLabel = { '90176': 'Advisor Connect', '90215': 'Spectrum Equities', '8
 
 export default function Favorites() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [views, setViews] = useState([])
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => searchParams.get('q') || '')
 
   useEffect(() => {
     let loaded = loadAllViewCentrals()
@@ -33,6 +34,21 @@ export default function Favorites() {
     }
     setViews(loaded)
   }, [])
+
+  // Sync search to URL params (debounced)
+  const searchDebounceRef = useRef(null)
+  useEffect(() => {
+    clearTimeout(searchDebounceRef.current)
+    searchDebounceRef.current = setTimeout(() => {
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev)
+        next.delete('q')
+        if (search) next.set('q', search)
+        return next
+      }, { replace: true })
+    }, 300)
+    return () => clearTimeout(searchDebounceRef.current)
+  }, [search]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshViews = () => setViews(loadAllViewCentrals())
   const favs = views.filter(v => v.favorite)

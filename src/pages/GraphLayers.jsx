@@ -676,18 +676,20 @@ export default function GraphLayers() {
     })
   }, [])
 
-  // Sync layer state to URL search params
+  // Sync seal + layer state to URL search params
   useEffect(() => {
     const activeKeys = Object.entries(layers)
       .filter(([k, v]) => v && k !== 'component')
       .map(([k]) => k)
     setSearchParams(prev => {
       const next = new URLSearchParams(prev)
+      if (selectedSeal) next.set('seal', selectedSeal)
+      else next.delete('seal')
       if (activeKeys.length > 0) next.set('layers', activeKeys.join(','))
       else next.delete('layers')
       return next
     }, { replace: true })
-  }, [layers, setSearchParams])
+  }, [selectedSeal, layers, setSearchParams])
 
   // Persist sidebarTab to sessionStorage
   useEffect(() => { sessionStorage.setItem('gl-sidebar-tab', String(sidebarTab)) }, [sidebarTab])

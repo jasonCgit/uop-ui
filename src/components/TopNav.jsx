@@ -4,7 +4,7 @@ import {
   Chip, Stack, IconButton, Menu, MenuItem, Tooltip,
   Avatar, Divider, ListItemIcon, ListItemText,
   Popover, List, ListItem, ListItemButton, Tab, Tabs, Dialog, DialogTitle, DialogContent,
-  Paper,
+  Paper, Autocomplete,
 } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import SearchIcon    from '@mui/icons-material/Search'
@@ -30,6 +30,7 @@ import StarIcon from '@mui/icons-material/Star'
 import LinkIcon from '@mui/icons-material/Link'
 import ShieldIcon from '@mui/icons-material/Shield'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
+import TuneIcon from '@mui/icons-material/Tune'
 
 import SpeedIcon from '@mui/icons-material/Speed'
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator'
@@ -101,7 +102,7 @@ export default function TopNav() {
   const [tabSearch, setTabSearch] = useState('')
   const [profileAnchor, setProfileAnchor] = useState(null)
   const { themeMode, toggleTheme } = useAppTheme()
-  const { filteredApps, totalApps, activeFilterCount, searchText, resetToDefaults } = useFilters()
+  const { filteredApps, totalApps, activeFilterCount, searchText, setSearchText, resetToDefaults, searchSuggestions, activeFilters, setFilterValues } = useFilters()
   const { refreshMs, setRefreshMs, displayTime, REFRESH_OPTIONS, triggerRefresh } = useRefresh()
   const { tenant, switchTenant } = useTenant()
   const { isAdmin } = useAuth()
@@ -219,18 +220,34 @@ export default function TopNav() {
   const activityCount = recentActivities.reduce((s, sec) =>
     s + (sec.items || []).filter(it => !isRead(sec.category, it.description)).length, 0)
 
-  // Ctrl+K / Cmd+K to open search
-  const searchTriggerRef = useRef(null)
+  // Ctrl+K / Cmd+K to focus inline search
+  const searchInputRef = useRef(null)
+  const filterIconRef = useRef(null)
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
-        setSearchAnchor(searchTriggerRef.current)
+        searchInputRef.current?.focus()
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [])
+
+  const handleSuggestionSelect = useCallback((_, val) => {
+    if (val && typeof val === 'object' && val.value) {
+      if (val.filterKey) {
+        const fv = val.filterValue || val.value
+        const current = activeFilters[val.filterKey] || []
+        if (!current.includes(fv)) {
+          setFilterValues(val.filterKey, [...current, fv])
+        }
+        setSearchText('')
+      } else {
+        setSearchText(val.value)
+      }
+    }
+  }, [activeFilters, setFilterValues, setSearchText])
 
   // Drag-and-drop state — label-based
   const dragLabel = useRef(null)
@@ -252,11 +269,17 @@ export default function TopNav() {
 
   const removeTab = (label, e) => {
     e.stopPropagation()
+    const idx = openTabs.indexOf(label)
     const next = openTabs.filter(l => l !== label)
     setOpenTabs(next)
     saveTabs(next)
     const tab = ALL_TABS.find(t => t.label === label)
-    if (tab?.path && pathname === tab.path) navigate('/')
+    if (tab?.path && pathname === tab.path) {
+      // Navigate to the adjacent tab (prefer the one to the left, then right)
+      const neighbor = next[Math.min(idx, next.length - 1)] || 'Home'
+      const neighborTab = ALL_TABS.find(t => t.label === neighbor)
+      navigate(neighborTab?.path || '/')
+    }
   }
 
   // Preserve user's tab order from openTabs (not ALL_TABS order)
@@ -311,7 +334,7 @@ export default function TopNav() {
 
   return (
     <AppBar
-      position="sticky"
+      position="static"
       sx={{ bgcolor: navBg, boxShadow: 'none', borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)'}` }}
     >
       <Toolbar sx={{ gap: 1.5, minHeight: '56px !important', px: { xs: '12px !important', sm: '24px !important' } }}>
@@ -613,35 +636,80 @@ export default function TopNav() {
           )}
         </Box>
 
-        {/* Search & Filter trigger */}
-        <Box
-          ref={searchTriggerRef}
-          onClick={(e) => setSearchAnchor(e.currentTarget)}
-          sx={{
-            display: 'flex', alignItems: 'center', gap: 0.75,
-            bgcolor: searchBg, borderRadius: 1,
-            px: 1.5, py: 0.4,
-            cursor: 'pointer',
-            '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
-            transition: 'background-color 0.15s',
+        {/* Inline search with type-ahead + filter trigger */}
+        <Autocomplete
+          freeSolo
+          options={searchSuggestions}
+          getOptionLabel={(opt) => typeof opt === 'string' ? opt : opt.value}
+          inputValue={searchText}
+          onInputChange={(_, v, reason) => { if (reason !== 'reset') setSearchText(v) }}
+          onChange={handleSuggestionSelect}
+          filterOptions={(x) => x}
+          componentsProps={{ popper: { style: { zIndex: 1300 } } }}
+          PaperComponent={(props) => (
+            <Paper {...props} sx={{ ...props.sx, mt: 0.5, border: '1px solid', borderColor: 'divider', borderRadius: 2 }} />
+          )}
+          renderOption={(props, opt) => {
+            const { key: liKey, ...rest } = props
+            return (
+              <li key={liKey} {...rest} style={{ ...rest.style, padding: '4px 12px', display: 'flex', gap: 8, alignItems: 'center' }}>
+                <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', minWidth: 55 }}>{opt.field}</Typography>
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, flex: 1 }} noWrap>{opt.value}</Typography>
+              </li>
+            )
           }}
-        >
-          <Badge
-            badgeContent={activeFilterCount}
-            color="primary"
-            sx={{ '& .MuiBadge-badge': { fontSize: '0.58rem', minWidth: 15, height: 15, p: 0 } }}
-          >
-            <SearchIcon sx={{ fontSize: 15, color: 'rgba(255,255,255,0.6)' }} />
-          </Badge>
-          <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem', userSelect: 'none', whiteSpace: 'nowrap' }}>
-            {activeFilterCount > 0 || searchText
-              ? `${filteredApps.length} of ${totalApps} apps`
-              : 'Search & Filter'}
-          </Typography>
-          <Typography sx={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.65rem', ml: 0.5, display: { xs: 'none', sm: 'block' } }}>
-            Ctrl+K
-          </Typography>
-        </Box>
+          ListboxProps={{ sx: { maxHeight: 200, '& .MuiAutocomplete-option': { minHeight: 28 } } }}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              inputRef={searchInputRef}
+              placeholder="Search"
+              variant="outlined"
+              size="small"
+              InputProps={{
+                ...params.InputProps,
+                startAdornment: (
+                  <>
+                    <SearchIcon sx={{ fontSize: 15, color: 'rgba(255,255,255,0.5)', mr: 0.5 }} />
+                    {params.InputProps.startAdornment}
+                  </>
+                ),
+                endAdornment: (
+                  <>
+                    {searchText && (
+                      <IconButton size="small" onClick={() => setSearchText('')} sx={{ p: 0.25 }}>
+                        <CloseIcon sx={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }} />
+                      </IconButton>
+                    )}
+                    <Tooltip title="Filters">
+                      <IconButton
+                        ref={filterIconRef}
+                        size="small"
+                        onClick={(e) => { e.stopPropagation(); setSearchAnchor(filterIconRef.current) }}
+                        sx={{ p: 0.25, ml: 0.25 }}
+                      >
+                        <Badge badgeContent={activeFilterCount} color="primary" sx={{ '& .MuiBadge-badge': { fontSize: '0.5rem', minWidth: 13, height: 13, p: 0 } }}>
+                          <TuneIcon sx={{ fontSize: 15, color: 'rgba(255,255,255,0.5)' }} />
+                        </Badge>
+                      </IconButton>
+                    </Tooltip>
+                  </>
+                ),
+              }}
+              sx={{
+                '& .MuiInputBase-root': {
+                  fontSize: '0.78rem', borderRadius: 1, bgcolor: searchBg,
+                  color: 'rgba(255,255,255,0.85)', height: 32, pr: '8px !important',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
+                  '&.Mui-focused': { bgcolor: 'rgba(255,255,255,0.15)', boxShadow: '0 0 0 2px rgba(96,165,250,0.3)' },
+                },
+                '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
+                '& .MuiInputBase-input::placeholder': { color: 'rgba(255,255,255,0.45)', opacity: 1 },
+              }}
+            />
+          )}
+          sx={{ width: 260, flexShrink: 0 }}
+        />
         <SearchFilterPopover
           anchorEl={searchAnchor}
           open={Boolean(searchAnchor)}

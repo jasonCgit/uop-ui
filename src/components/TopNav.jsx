@@ -1325,7 +1325,7 @@ export default function TopNav() {
               bgcolor: menuBg,
               border: `1px solid ${menuBorder}`,
               minWidth: 220,
-              mt: 0.5,
+              mt: 1.5,
             },
           }}
           transformOrigin={{ horizontal: 'right', vertical: 'top' }}

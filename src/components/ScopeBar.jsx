@@ -137,6 +137,10 @@ export default function ScopeBar() {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       sx={{
+        position: 'sticky',
+        top: 56,
+        zIndex: (t) => t.zIndex.appBar - 1,
+        bgcolor: 'background.default',
         overflow: 'hidden',
         maxHeight: showBar ? 40 : 3,
         transition: 'max-height 0.25s ease-in-out',

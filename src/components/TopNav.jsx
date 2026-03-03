@@ -1251,6 +1251,7 @@ export default function TopNav() {
           anchorEl={profileAnchor}
           open={Boolean(profileAnchor)}
           onClose={() => setProfileAnchor(null)}
+          disableScrollLock
           PaperProps={{
             sx: {
               bgcolor: menuBg,

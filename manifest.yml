@@ -1,0 +1,7 @@
+applications:
+  - name: uop-ui
+    memory: 64M
+    instances: 2
+    buildpack: staticfile_buildpack
+    path: dist
+    health-check-type: port

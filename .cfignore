@@ -1,0 +1,9 @@
+node_modules/
+src/
+public/
+.git/
+.gitignore
+*.md
+gifs/
+*.log
+.DS_Store

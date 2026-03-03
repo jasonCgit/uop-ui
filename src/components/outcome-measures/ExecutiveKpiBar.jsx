@@ -1,0 +1,89 @@
+import { Grid, Card, Typography, Box, Chip } from '@mui/material'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
+import TrendingDownIcon from '@mui/icons-material/TrendingDown'
+import TrendingFlatIcon from '@mui/icons-material/TrendingFlat'
+
+const fTitle = { fontSize: 'clamp(0.7rem, 0.9vw, 0.8rem)' }
+const fValue = { fontSize: 'clamp(1.2rem, 2vw, 1.8rem)', fontWeight: 700 }
+const fSmall = { fontSize: 'clamp(0.6rem, 0.75vw, 0.7rem)' }
+
+function MiniSparkline({ data, color, width = 48, height = 18 }) {
+  if (!data || data.length < 2) return null
+  const min = Math.min(...data)
+  const max = Math.max(...data)
+  const range = max - min || 1
+  const points = data.map((v, i) =>
+    `${(i / (data.length - 1)) * width},${height - ((v - min) / range) * height}`
+  ).join(' ')
+  return (
+    <svg width={width} height={height} style={{ display: 'block' }}>
+      <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function TrendBadge({ pct, lowerIsBetter }) {
+  const improved = lowerIsBetter ? pct < 0 : pct > 0
+  const color = pct === 0 ? 'default' : improved ? 'success' : 'error'
+  const Icon = pct === 0 ? TrendingFlatIcon : pct > 0 ? TrendingUpIcon : TrendingDownIcon
+  return (
+    <Chip
+      size="small"
+      icon={<Icon sx={{ fontSize: 14 }} />}
+      label={`${pct > 0 ? '+' : ''}${pct}%`}
+      color={color}
+      variant="outlined"
+      sx={{ height: 20, ...fSmall, '& .MuiChip-icon': { ml: 0.3 } }}
+    />
+  )
+}
+
+export default function ExecutiveKpiBar({ kpis, appCount }) {
+  if (!kpis?.length) return null
+  return (
+    <Box sx={{ mb: 1.5 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, gap: 1 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: 'clamp(0.85rem, 1.2vw, 1rem)' }}>
+          Outcome Measures
+        </Typography>
+        <Chip label={`${appCount} apps`} size="small" variant="outlined" sx={{ height: 20, ...fSmall }} />
+      </Box>
+      <Grid container spacing={1}>
+        {kpis.map((kpi, i) => {
+          const improved = kpi.lower_is_better ? kpi.pct_change < 0 : kpi.pct_change > 0
+          const accentColor = kpi.pct_change === 0 ? '#78909c' : improved ? '#4caf50' : '#f44336'
+          return (
+            <Grid item xs={6} sm={4} md={2} key={i}>
+              <Card variant="outlined" sx={{
+                p: 1.5, height: '100%',
+                borderColor: `${accentColor}30`,
+                background: (t) => t.palette.mode === 'dark' ? `${accentColor}08` : `${accentColor}05`,
+              }}>
+                <Typography sx={{ ...fTitle, color: 'text.secondary', mb: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {kpi.label}
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                  <Typography sx={{ ...fValue, color: accentColor }}>
+                    {typeof kpi.current === 'number' ? kpi.current.toLocaleString() : kpi.current}
+                  </Typography>
+                  {kpi.unit && (
+                    <Typography sx={{ ...fSmall, color: 'text.secondary' }}>{kpi.unit}</Typography>
+                  )}
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                  <TrendBadge pct={kpi.pct_change} lowerIsBetter={kpi.lower_is_better} />
+                  {kpi.spark?.length > 1 && (
+                    <MiniSparkline data={kpi.spark} color={accentColor} />
+                  )}
+                </Box>
+                <Typography sx={{ ...fSmall, color: 'text.disabled', mt: 0.3 }}>
+                  Baseline: {kpi.baseline.toLocaleString()}{kpi.unit ? ` ${kpi.unit}` : ''}
+                </Typography>
+              </Card>
+            </Grid>
+          )
+        })}
+      </Grid>
+    </Box>
+  )
+}

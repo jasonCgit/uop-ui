@@ -17,6 +17,9 @@ import IncidentZero    from './pages/IncidentZero'
 import Announcements   from './pages/Announcements'
 import Links           from './pages/Links'
 import Admin           from './pages/Admin'
+import EssentialServices from './pages/EssentialServices'
+import OutcomeMeasures from './pages/OutcomeMeasures'
+import SituationRoom   from './pages/SituationRoom'
 import Teams           from './pages/Teams'
 import Profile         from './pages/Profile'
 import AuraChatFab     from './aura/AuraChatFab'
@@ -79,6 +82,9 @@ export default function App() {
             <Route path="/announcements"   element={<Announcements />} />
             <Route path="/links"           element={<Links />} />
             <Route path="/teams"           element={<Teams />} />
+            <Route path="/essential-services" element={<EssentialServices />} />
+            <Route path="/outcome-measures" element={<OutcomeMeasures />} />
+            <Route path="/situation-room" element={<SituationRoom />} />
             <Route path="/profile"         element={<ProfilePage />} />
             <Route path="/portals"         element={<Admin />} />
             <Route path="/admin"           element={<Navigate to="/portals" replace />} />

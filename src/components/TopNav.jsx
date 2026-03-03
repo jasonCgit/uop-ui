@@ -37,6 +37,9 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator'
 import ViewQuiltIcon from '@mui/icons-material/ViewQuilt'
 import GroupsIcon from '@mui/icons-material/Groups'
 import LayersIcon from '@mui/icons-material/Layers'
+import AssessmentIcon from '@mui/icons-material/Assessment'
+import MedicalServicesIcon from '@mui/icons-material/MedicalServices'
+import CrisisAlertIcon from '@mui/icons-material/CrisisAlert'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAppTheme } from '../ThemeContext'
 import { useFilters } from '../FilterContext'
@@ -57,9 +60,12 @@ const ALL_TABS = [
   { label: 'Applications',      path: '/applications',    Icon: AppsIcon,        desc: 'Manage app inventory & health' },
   { label: 'Blast Radius',      path: '/graph-layers',    Icon: LayersIcon,      desc: 'Multi-layer dependency visualization' },
   { label: 'Customer Journeys', path: '/customer-journey', Icon: RouteIcon,      desc: 'End-to-end user experience' },
+  { label: 'Essential Services', path: '/essential-services', Icon: MedicalServicesIcon, desc: 'Business-critical service health' },
   { label: 'Favorites',         path: '/favorites',       Icon: StarIcon,        desc: 'Pinned View Centrals' },
   { label: 'Incident Zero',    path: '/incident-zero',   Icon: ShieldIcon,      desc: 'Proactive pre-incident management' },
   { label: 'Links',             path: '/links',           Icon: LinkIcon,        desc: 'Quick links & resources' },
+  { label: 'Outcome Measures', path: '/outcome-measures', Icon: AssessmentIcon,  desc: 'SRE outcome metrics & trends' },
+  { label: 'Situation Room',    path: '/situation-room',  Icon: CrisisAlertIcon, desc: 'Live P1 incident management' },
   { label: 'SLO Agent',         path: '/slo-agent',       Icon: SpeedIcon,       desc: 'Auto management of SLOs' },
   { label: 'Teams',             path: '/teams',           Icon: GroupsIcon,      desc: 'Manage team contacts & channels' },
   { label: 'View Central',      path: '/view-central',    Icon: ViewQuiltIcon,   desc: 'Custom dashboards' },

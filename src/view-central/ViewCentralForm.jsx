@@ -1,27 +1,14 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Button, Box, Typography, Autocomplete, Chip,
-  Checkbox,
+  TextField, Button, Box, Typography, Chip,
 } from '@mui/material'
 import TuneIcon from '@mui/icons-material/Tune'
-import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank'
-import CheckBoxIcon from '@mui/icons-material/CheckBox'
-import { getFilterOptions, FILTER_FIELDS, SUB_LOB_MAP } from '../data/appData'
+import FilterPickerGrid from '../components/FilterPickerGrid'
+import { APPS, parseSealDisplay } from '../data/appData'
 
-const fSmall = { fontSize: 'clamp(0.6rem, 0.8vw, 0.7rem)' }
-const fTiny = { fontSize: 'clamp(0.55rem, 0.72vw, 0.64rem)' }
-
-const checkIcon = <CheckBoxIcon sx={{ fontSize: 16 }} />
-const uncheckIcon = <CheckBoxOutlineBlankIcon sx={{ fontSize: 16 }} />
-
-const COMPACT_KEYS = new Set(['lob', 'cpof', 'state', 'rto', 'riskRanking'])
-
-const FILTER_GROUPS = [
-  { label: 'Taxonomy',          keys: ['lob', 'subLob', 'seal', 'state', 'classification', 'investmentStrategy'] },
-  { label: 'People',            keys: ['cto', 'cbt', 'appOwner'] },
-  { label: 'Risk & Compliance', keys: ['cpof', 'riskRanking', 'rto'] },
-]
+const fSmall = { fontSize: 'clamp(0.65rem, 0.82vw, 0.74rem)' }
+const fTiny = { fontSize: 'clamp(0.58rem, 0.75vw, 0.68rem)' }
 
 export default function ViewCentralForm({ open, onClose, onSave, existingView }) {
   const isEdit = !!existingView
@@ -38,7 +25,28 @@ export default function ViewCentralForm({ open, onClose, onSave, existingView })
     })
   }
 
+  const clearFilter = (key) => {
+    setFilters(prev => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
+
   const activeFilterCount = Object.values(filters).reduce((s, v) => s + (v?.length || 0), 0)
+
+  const matchCount = useMemo(() => {
+    return APPS.filter(app => {
+      for (const [key, values] of Object.entries(filters)) {
+        if (!values || values.length === 0) continue
+        if (key === 'seal') {
+          const rawValues = values.map(parseSealDisplay)
+          if (!rawValues.includes(app.seal)) return false
+        } else if (!values.includes(app[key])) return false
+      }
+      return true
+    }).length
+  }, [filters])
 
   const handleSave = () => {
     if (!name.trim()) return
@@ -50,104 +58,52 @@ export default function ViewCentralForm({ open, onClose, onSave, existingView })
     })
   }
 
-  const renderFilterField = (key) => {
-    const field = FILTER_FIELDS.find(f => f.key === key)
-    if (!field) return null
-
-    const subLobDisabled = key === 'subLob' &&
-      !(filters.lob || []).some(l => SUB_LOB_MAP[l])
-
-    const selectedCount = (filters[key] || []).length
-
-    return (
-      <Autocomplete
-        key={key}
-        multiple
-        size="small"
-        disabled={subLobDisabled}
-        options={getFilterOptions(key, filters)}
-        value={filters[key] || []}
-        onChange={(_, val) => setFilterValue(key, val)}
-        disableCloseOnSelect
-        limitTags={1}
-        renderOption={(props, option, { selected }) => {
-          const { key: liKey, ...rest } = props
-          return (
-            <li key={liKey} {...rest} style={{ ...rest.style, padding: '1px 8px', minHeight: 26 }}>
-              <Checkbox
-                icon={uncheckIcon}
-                checkedIcon={checkIcon}
-                checked={selected}
-                sx={{ p: 0, mr: 0.75 }}
-                size="small"
-              />
-              <Typography noWrap sx={{ ...fTiny, lineHeight: 1.2 }}>{option}</Typography>
-            </li>
-          )
-        }}
-        ListboxProps={{
-          sx: {
-            maxHeight: 180,
-            '& .MuiAutocomplete-option': { py: 0.15, minHeight: 26 },
-          },
-        }}
-        renderInput={(params) => (
-          <TextField {...params}
-            label={subLobDisabled ? 'Sub LOB (select AWM / CIB)' : (
-              selectedCount > 0 ? `${field.label} (${selectedCount})` : field.label
-            )}
-            variant="outlined" size="small"
-            sx={{
-              '& .MuiInputLabel-root': { ...fSmall, transform: 'translate(10px, 6px) scale(1)' },
-              '& .MuiInputLabel-shrunk': { transform: 'translate(14px, -6px) scale(0.85)' },
-              '& .MuiInputBase-root': {
-                ...fSmall, borderRadius: 1.5, minHeight: 32, py: '2px !important',
-              },
-              '& .MuiOutlinedInput-notchedOutline': { borderRadius: 1.5 },
-            }}
-          />
-        )}
-        sx={{
-          '& .MuiChip-root': { height: 18, ...fTiny, borderRadius: 0.75, maxWidth: 90 },
-          '& .MuiAutocomplete-tag': { maxWidth: 90, my: 0 },
-          '& .MuiAutocomplete-inputRoot': { flexWrap: 'nowrap', overflow: 'hidden' },
-        }}
-      />
-    )
-  }
-
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ fontWeight: 700, fontSize: '1rem' }}>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle sx={{
+        fontWeight: 700, fontSize: 'clamp(0.9rem, 1.1vw, 1rem)',
+        pb: 1, display: 'flex', alignItems: 'center', gap: 1,
+      }}>
         {isEdit ? 'Edit View Central' : 'Create View Central'}
       </DialogTitle>
-      <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-          <TextField
-            label="Name"
-            required
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="e.g., Spectrum Equities Dashboard"
-            size="small"
-            inputProps={{ maxLength: 60 }}
-          />
-          <TextField
-            label="Description"
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder="Brief description of this view's scope"
-            size="small"
-            multiline
-            rows={2}
-            inputProps={{ maxLength: 200 }}
-          />
+      <DialogContent sx={{ pb: 1 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 0.5 }}>
+          {/* Name & Description side by side */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+            <TextField
+              label="Name"
+              required
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g., Spectrum Equities Dashboard"
+              size="small"
+              inputProps={{ maxLength: 60 }}
+              sx={{ '& .MuiInputBase-root': fSmall }}
+            />
+            <TextField
+              label="Description"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Brief description of this view's scope"
+              size="small"
+              inputProps={{ maxLength: 200 }}
+              sx={{ '& .MuiInputBase-root': fSmall }}
+            />
+          </Box>
 
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography fontWeight={600} color="text.secondary" sx={{ ...fSmall, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-                Filter Scope
-              </Typography>
+          {/* Filter Scope header */}
+          <Box sx={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            mt: 0.5, pb: 0.5, borderBottom: '1px solid', borderColor: 'divider',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Box sx={{
+                width: 22, height: 22, borderRadius: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(96,165,250,0.15)' : 'rgba(21,101,192,0.1)',
+              }}>
+                <TuneIcon sx={{ fontSize: 13, color: 'primary.main' }} />
+              </Box>
+              <Typography fontWeight={700} sx={fSmall}>Filter Scope</Typography>
               {activeFilterCount > 0 && (
                 <Chip
                   label={`${activeFilterCount} active`}
@@ -156,52 +112,39 @@ export default function ViewCentralForm({ open, onClose, onSave, existingView })
                 />
               )}
             </Box>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5, fontSize: '0.72rem' }}>
-              Define which applications this View Central monitors.
-            </Typography>
-
-            {FILTER_GROUPS.map((group) => (
-              <Box key={group.label} sx={{ mb: 1.5, '&:last-child': { mb: 0 } }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.75 }}>
-                  <TuneIcon sx={{ fontSize: 12, color: 'text.disabled' }} />
-                  <Typography fontWeight={700} color="text.secondary"
-                    sx={{ textTransform: 'uppercase', letterSpacing: 0.8, ...fTiny }}>
-                    {group.label}
-                  </Typography>
-                  <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider', ml: 0.5 }} />
-                </Box>
-
-                <Box sx={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(3, 1fr)',
-                  gap: 1,
-                }}>
-                  {group.keys.map((key) => {
-                    const isWide = !COMPACT_KEYS.has(key)
-                    return (
-                      <Box key={key} sx={{ gridColumn: isWide ? 'span 2' : 'span 1' }}>
-                        {renderFilterField(key)}
-                      </Box>
-                    )
-                  })}
-                </Box>
-              </Box>
-            ))}
-
-            {activeFilterCount > 0 && (
-              <Typography
-                onClick={() => setFilters({})}
-                sx={{ ...fTiny, color: 'error.main', cursor: 'pointer', fontWeight: 600, mt: 1, '&:hover': { textDecoration: 'underline' } }}
-              >
-                Clear all filters
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography color="text.secondary" sx={fTiny}>
+                <Box component="span" sx={{ color: 'primary.main', fontWeight: 700 }}>{matchCount}</Box> of {APPS.length} apps
               </Typography>
-            )}
+              {activeFilterCount > 0 && (
+                <Typography
+                  onClick={() => setFilters({})}
+                  sx={{ ...fTiny, color: 'error.main', cursor: 'pointer', fontWeight: 600, '&:hover': { textDecoration: 'underline' } }}
+                >
+                  Clear all
+                </Typography>
+              )}
+            </Box>
           </Box>
+
+          {/* Shared FilterPickerGrid — same as top-of-page */}
+          <FilterPickerGrid
+            filters={filters}
+            onChange={setFilterValue}
+            onClear={clearFilter}
+            compact
+          />
         </Box>
       </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} size="small">Cancel</Button>
-        <Button onClick={handleSave} variant="contained" size="small" disabled={!name.trim()}>
+      <DialogActions sx={{ px: 3, pb: 2, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+        <Button onClick={onClose} size="small" sx={{ ...fSmall, textTransform: 'none' }}>Cancel</Button>
+        <Button
+          onClick={handleSave}
+          variant="contained"
+          size="small"
+          disabled={!name.trim()}
+          sx={{ ...fSmall, textTransform: 'none', fontWeight: 700, px: 3, borderRadius: 1.5 }}
+        >
           {isEdit ? 'Save Changes' : 'Create'}
         </Button>
       </DialogActions>

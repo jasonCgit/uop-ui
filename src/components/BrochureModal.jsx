@@ -13,6 +13,10 @@ import RouteIcon          from '@mui/icons-material/Route'
 import SpeedIcon          from '@mui/icons-material/Speed'
 import CampaignIcon       from '@mui/icons-material/Campaign'
 import ShieldIcon         from '@mui/icons-material/Shield'
+import MedicalServicesIcon from '@mui/icons-material/MedicalServices'
+import AssessmentIcon     from '@mui/icons-material/Assessment'
+import GroupsIcon         from '@mui/icons-material/Groups'
+import CrisisAlertIcon    from '@mui/icons-material/CrisisAlert'
 import HubIcon            from '@mui/icons-material/Hub'
 import MenuBookIcon       from '@mui/icons-material/MenuBook'
 import SupportAgentIcon   from '@mui/icons-material/SupportAgent'
@@ -92,11 +96,39 @@ const FEATURES = [
     gif: 'announcements.gif',
     desc: 'Create, manage, and broadcast platform announcements — with search, filters, pinning, and live auto-refresh.',
   },
+  {
+    icon: MedicalServicesIcon,
+    color: '#14b8a6',
+    title: 'Essential Services',
+    gif: 'essential-services.gif',
+    desc: '15 business-critical service health monitoring — risk matrix heatmap, business process impact chains, and ReactFlow dependency visualization.',
+  },
+  {
+    icon: AssessmentIcon,
+    color: '#8b5cf6',
+    title: 'Outcome Measures',
+    gif: 'outcome-measures.gif',
+    desc: 'SRE outcome metrics across 5 sections — 12-month trend charts, baseline comparisons, CTO/CBT leaderboards, and workstream tracking.',
+  },
+  {
+    icon: CrisisAlertIcon,
+    color: '#ef4444',
+    title: 'Situation Room',
+    gif: 'situation-room.gif',
+    desc: 'Major incident command center — system-level health tracking, timeline stages, impacted capability mapping, SRE lead assignments, and exportable situation reports.',
+  },
+  {
+    icon: GroupsIcon,
+    color: '#f472b6',
+    title: 'Teams Management',
+    gif: 'teams.gif',
+    desc: 'Full CRUD team management with role-based member assignments, corporate directory search, and multi-team application associations.',
+  },
 ]
 
 const METRICS = [
   { value: '34+',  label: 'Services Monitored' },
-  { value: '11',   label: 'Observability Views' },
+  { value: '14',   label: 'Observability Views' },
   { value: '<30s', label: 'Mean Time to Detect' },
   { value: '90d',  label: 'Incident History' },
 ]

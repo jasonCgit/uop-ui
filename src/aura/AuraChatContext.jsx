@@ -1,12 +1,30 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
-import { API_URL } from '../config'
+import { API_URL, AURA_BACKEND, AURA_API_URL, SMARTSDK_API_URL } from '../config'
 
 const AuraChatContext = createContext()
 export const useAuraChat = () => useContext(AuraChatContext)
 
 const STORAGE_KEY = 'aura-chat-history'
 const SESSIONS_KEY = 'aura-chat-sessions'
+const BACKEND_KEY = 'aura-backend-override'
 const MAX_MESSAGES = 50
+const MAX_CONSECUTIVE_ERRORS = 3
+
+function getInitialBackend() {
+  // URL param takes priority (e.g. ?aura_backend=smartsdk)
+  const params = new URLSearchParams(window.location.search)
+  const paramBackend = params.get('aura_backend')
+  if (paramBackend === 'aura' || paramBackend === 'smartsdk') return paramBackend
+  // localStorage override from hidden toggle
+  const stored = localStorage.getItem(BACKEND_KEY)
+  if (stored === 'aura' || stored === 'smartsdk') return stored
+  // Default from config
+  return AURA_BACKEND
+}
+
+function getBackendUrl(backend) {
+  return backend === 'smartsdk' ? (SMARTSDK_API_URL || API_URL) : (AURA_API_URL || API_URL)
+}
 
 function loadFromStorage() {
   try {
@@ -63,7 +81,21 @@ export function AuraChatProvider({ children }) {
   const [attachments, setAttachments] = useState([])
   const [activeSessionId, setActiveSessionId] = useState(() => crypto.randomUUID())
   const [chatSessions, setChatSessions] = useState(loadSessions)
+  const [backend, setBackendState] = useState(getInitialBackend)
+  const [showAdvanced, setShowAdvanced] = useState(() => localStorage.getItem(BACKEND_KEY) !== null)
   const abortRef = useRef(null)
+  const consecutiveErrorsRef = useRef(0)
+
+  const setBackend = useCallback((value) => {
+    setBackendState(value)
+    localStorage.setItem(BACKEND_KEY, value)
+  }, [])
+
+  const clearBackendOverride = useCallback(() => {
+    setBackendState(AURA_BACKEND)
+    localStorage.removeItem(BACKEND_KEY)
+    setShowAdvanced(false)
+  }, [])
 
   const sendMessage = useCallback(async (text) => {
     const currentAttachments = [...attachments]
@@ -96,7 +128,12 @@ export function AuraChatProvider({ children }) {
       const controller = new AbortController()
       abortRef.current = controller
 
-      const res = await fetch(`${API_URL}/api/aura/chat`, {
+      // 30s connection timeout — triggers failover if backend is unreachable/hanging
+      let timedOut = false
+      const timeoutId = setTimeout(() => { timedOut = true; controller.abort() }, 30000)
+
+      const backendUrl = getBackendUrl(backend)
+      const res = await fetch(`${backendUrl}/api/aura/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -106,6 +143,11 @@ export function AuraChatProvider({ children }) {
         signal: controller.signal,
       })
 
+      clearTimeout(timeoutId)
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      consecutiveErrorsRef.current = 0
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
@@ -153,7 +195,14 @@ export function AuraChatProvider({ children }) {
         }
       }
     } catch (err) {
-      if (err.name !== 'AbortError') {
+      if (err.name === 'AbortError' && !timedOut) {
+        // User-initiated cancel — don't count as error
+      } else {
+        consecutiveErrorsRef.current++
+        // Auto-failover: switch to SmartSDK after 3 consecutive failures on AURA
+        if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS && backend === 'aura' && SMARTSDK_API_URL) {
+          setBackendState('smartsdk')
+        }
         setMessages(prev => {
           // If the streaming message has no content, replace it with error
           const last = prev[prev.length - 1]
@@ -170,10 +219,11 @@ export function AuraChatProvider({ children }) {
         })
       }
     } finally {
+      clearTimeout(timeoutId)
       setIsLoading(false)
       abortRef.current = null
     }
-  }, [attachments])
+  }, [attachments, backend])
 
   // Save current session to history before switching away
   const saveCurrentSession = useCallback(() => {
@@ -281,8 +331,10 @@ export function AuraChatProvider({ children }) {
     <AuraChatContext.Provider value={{
       isOpen, isExpanded, menuOpen, messages, isLoading, attachments,
       chatSessions, activeSessionId,
+      backend, showAdvanced,
       sendMessage, clearChat, newChat, toggleOpen, toggleExpand, toggleMenu,
       addAttachment, removeAttachment, activateSession, setMessageFeedback,
+      setBackend, setShowAdvanced, clearBackendOverride,
     }}>
       {children}
     </AuraChatContext.Provider>

@@ -8,6 +8,7 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import ToggleOnIcon from '@mui/icons-material/ToggleOn'
 import ToggleOffIcon from '@mui/icons-material/ToggleOff'
 import CloseIcon from '@mui/icons-material/Close'
+import SettingsIcon from '@mui/icons-material/Settings'
 import { useState } from 'react'
 import { useAuraChat } from './AuraChatContext'
 
@@ -55,9 +56,10 @@ const CUSTOMIZATIONS = [
 ]
 
 export default function AuraChatMenu({ onClose }) {
-  const { chatSessions, activateSession, messages } = useAuraChat()
+  const { chatSessions, activateSession, messages, backend, showAdvanced, setBackend, clearBackendOverride } = useAuraChat()
   const [historyOpen, setHistoryOpen] = useState(true)
   const [customOpen, setCustomOpen] = useState(true)
+  const [advancedOpen, setAdvancedOpen] = useState(true)
   const [toggles, setToggles] = useState(() =>
     Object.fromEntries(CUSTOMIZATIONS.map(c => [c.key, c.defaultOn]))
   )
@@ -180,6 +182,77 @@ export default function AuraChatMenu({ onClose }) {
           ))}
         </Box>
       </Collapse>
+
+      {/* Advanced — only visible after 5-click on header title */}
+      {showAdvanced && (
+        <>
+          <Divider sx={{ borderColor: t => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'divider' }} />
+          <SectionHeader
+            icon={SettingsIcon}
+            title="Advanced"
+            expanded={advancedOpen}
+            onToggle={() => setAdvancedOpen(p => !p)}
+          />
+          <Collapse in={advancedOpen}>
+            <Box sx={{ px: 1, pb: 1.5 }}>
+              <Typography sx={{ ...fTiny, color: 'text.disabled', px: 1, pb: 0.5 }}>
+                AI Backend
+              </Typography>
+              {[
+                { key: 'aura', label: 'AURA', description: 'Primary — routed through AURA team' },
+                { key: 'smartsdk', label: 'Direct SmartSDK', description: 'Fallback — UOP-managed agent' },
+              ].map((opt) => (
+                <Box
+                  key={opt.key}
+                  onClick={() => setBackend(opt.key)}
+                  sx={{
+                    display: 'flex', alignItems: 'center', gap: 0.75,
+                    px: 1, py: 0.5,
+                    borderRadius: 1,
+                    cursor: 'pointer',
+                    bgcolor: backend === opt.key
+                      ? (t => t.palette.mode === 'dark' ? 'rgba(96,165,250,0.12)' : 'rgba(21,101,192,0.08)')
+                      : 'transparent',
+                    '&:hover': {
+                      bgcolor: t => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                    },
+                    mb: 0.25,
+                  }}
+                >
+                  {backend === opt.key
+                    ? <CheckCircleOutlineIcon sx={{ fontSize: 16, color: t => t.palette.mode === 'dark' ? '#60a5fa' : '#1565C0', flexShrink: 0 }} />
+                    : <Box sx={{ width: 16, height: 16, flexShrink: 0 }} />}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography fontWeight={backend === opt.key ? 600 : 400} sx={{ ...fTiny, color: 'text.primary', lineHeight: 1.3 }}>
+                      {opt.label}
+                    </Typography>
+                    <Typography sx={{ ...fTiny, color: 'text.disabled', lineHeight: 1.2, fontSize: 'clamp(0.52rem, 0.65vw, 0.6rem)' }}>
+                      {opt.description}
+                    </Typography>
+                  </Box>
+                </Box>
+              ))}
+              <Box
+                onClick={clearBackendOverride}
+                sx={{
+                  display: 'flex', alignItems: 'center', gap: 0.75,
+                  px: 1, py: 0.5, mt: 0.5,
+                  borderRadius: 1,
+                  cursor: 'pointer',
+                  '&:hover': {
+                    bgcolor: t => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                  },
+                }}
+              >
+                <CloseIcon sx={{ fontSize: 14, color: 'text.disabled', flexShrink: 0 }} />
+                <Typography sx={{ ...fTiny, color: 'text.disabled', lineHeight: 1.3 }}>
+                  Reset &amp; hide advanced
+                </Typography>
+              </Box>
+            </Box>
+          </Collapse>
+        </>
+      )}
     </Box>
   )
 }

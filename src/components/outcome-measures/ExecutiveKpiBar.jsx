@@ -134,7 +134,7 @@ function BucketCard({ bucketKey, items, sx }) {
       </Box>
       <Grid container spacing={2} justifyContent="center">
         {items.map((kpi, i) => (
-          <Grid item xs={6} key={i}>
+          <Grid item xs={6} {...(isResults ? { sm: 4, md: 2 } : {})} key={i}>
             <HeroKpi kpi={kpi} />
           </Grid>
         ))}
@@ -267,20 +267,20 @@ export default function ExecutiveKpiBar({ kpis, appCount, baselinePeriod, onBase
         </Card>
       )}
       <Grid container spacing={1}>
-        {/* Left column: Adoption stacked over SRE Coverage */}
-        <Grid item xs={12} md={6}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, height: '100%' }}>
-            {grouped.adoption?.length > 0 && (
-              <BucketCard bucketKey="adoption" items={grouped.adoption} />
-            )}
-            {grouped.sre_coverage?.length > 0 && (
-              <BucketCard bucketKey="sre_coverage" items={grouped.sre_coverage} />
-            )}
-          </Box>
-        </Grid>
-        {/* Right column: Results spanning full height */}
-        {grouped.results?.length > 0 && (
+        {/* Top row: Adoption + SRE Coverage side by side */}
+        {grouped.adoption?.length > 0 && (
           <Grid item xs={12} md={6}>
+            <BucketCard bucketKey="adoption" items={grouped.adoption} />
+          </Grid>
+        )}
+        {grouped.sre_coverage?.length > 0 && (
+          <Grid item xs={12} md={6}>
+            <BucketCard bucketKey="sre_coverage" items={grouped.sre_coverage} />
+          </Grid>
+        )}
+        {/* Bottom row: Results full width */}
+        {grouped.results?.length > 0 && (
+          <Grid item xs={12}>
             <BucketCard bucketKey="results" items={grouped.results} />
           </Grid>
         )}

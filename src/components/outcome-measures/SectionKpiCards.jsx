@@ -49,6 +49,15 @@ const METRIC_LABELS = {
   suppression_rate: 'Suppression Rate',
 }
 
+// Summary-only metrics (shown in executive KPI bar, hidden from detail tabs)
+const SUMMARY_ONLY = new Set([
+  'total_users_week', 'mcp_requests',                       // Adoption summary
+  'dynatrace_coverage', 'golden_signals_coverage',           // SRE Coverage summary
+  'anomaly_rate', 'ai_impact_duration', 'alert_response_time', // Results summary
+  'response_time_by_type', 'p1_incidents',                   // Results summary
+  // cost reduction is computed as combined KPI in executive bar
+])
+
 function MiniSparkline({ data, color, width = 56, height = 22 }) {
   if (!data || data.length < 2) return null
   const min = Math.min(...data)
@@ -68,11 +77,13 @@ export default function SectionKpiCards({ data }) {
   if (!data?.metrics) return null
   const metrics = data.metrics
 
-  const cards = Object.entries(metrics).map(([key, m]) => ({
-    key,
-    label: METRIC_LABELS[key] || key.replace(/_/g, ' '),
-    ...m,
-  }))
+  const cards = Object.entries(metrics)
+    .filter(([key]) => !SUMMARY_ONLY.has(key))
+    .map(([key, m]) => ({
+      key,
+      label: METRIC_LABELS[key] || key.replace(/_/g, ' '),
+      ...m,
+    }))
 
   return (
     <Grid container spacing={1} sx={{ mb: 1 }}>

@@ -9,6 +9,7 @@ const fSmall = { fontSize: 'clamp(0.58rem, 0.72vw, 0.65rem)' }
 
 const METRIC_LABELS = {
   // Adoption
+  total_users_week: 'Total Users / Week',
   mcp_requests: 'MCP Requests (FinOps)',
   uop_chat_prompts: 'UOP Chat Prompts',
   clicks_blast_radius: 'Clicks — Blast Radius',
@@ -24,6 +25,8 @@ const METRIC_LABELS = {
   golden_signals_coverage: 'Golden Signals Coverage',
   // Results
   incidents_avoided: 'Incidents Avoided → Code Updates in DevGPT',
+  incidents_avoided_uat: 'Incidents Avoided — UAT',
+  incidents_avoided_prod: 'Incidents Avoided — Prod',
   p1_incidents: 'P1 Incidents',
   p2_incidents: 'P2 Incidents',
   p3_incidents: 'P3 Incidents',
@@ -34,6 +37,12 @@ const METRIC_LABELS = {
   mttr_p3: 'MTTR — P3',
   ai_impact_duration: 'AI Driven Impact Duration',
   anomaly_rate: 'Anomalies per 100 Changes',
+  change_aware_anomaly_rate: 'Change Aware Anomaly Rate',
+  alert_response_time: 'Alert Response Time',
+  response_type_breakdown: 'Response Type (AIOps/UOP/AURA)',
+  response_time_by_type: 'Response Time by Type',
+  pct_p1p2_detected_by_alerts: '% P1/P2 Detected by Alerts',
+  actionable_alerts_reduction: 'Actionable Alerts / Escalation Reduction',
   cost_reduction_zero_touch: 'Cost Reduction — Zero Touch',
   cost_reduction_techsupport: 'Cost Reduction — TechSupport Agent',
   alert_noise_reduction: 'Alert Noise Reduction',

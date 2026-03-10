@@ -95,21 +95,22 @@ export default function SectionKpiCards({ data }) {
           <Grid item xs={6} sm={4} md={3} key={card.key}>
             <Card variant="outlined" sx={{
               p: 1.5, height: '100%',
+              display: 'flex', flexDirection: 'column', gap: 0.75,
               borderColor: `${accentColor}25`,
               background: (t) => t.palette.mode === 'dark' ? `${accentColor}06` : `${accentColor}04`,
             }}>
-              <Typography sx={{ ...fLabel, color: 'text.secondary', mb: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <Typography sx={{ ...fLabel, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {card.label}
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
-                <Typography sx={{ ...fValue, color: accentColor }}>
-                  {typeof card.current === 'number' ? card.current.toLocaleString() : card.current}
-                </Typography>
-                {card.unit && (
-                  <Typography sx={{ ...fSmall, color: 'text.secondary' }}>{card.unit}</Typography>
-                )}
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', justifyItems: 'center', rowGap: 0.5, columnGap: 6 }}>
+                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                  <Typography sx={{ ...fValue, color: accentColor }}>
+                    {typeof card.current === 'number' ? card.current.toLocaleString() : card.current}
+                  </Typography>
+                  {card.unit && (
+                    <Typography sx={{ ...fSmall, color: 'text.secondary' }}>{card.unit}</Typography>
+                  )}
+                </Box>
                 <Chip
                   size="small"
                   icon={<Icon sx={{ fontSize: 13 }} />}
@@ -118,11 +119,11 @@ export default function SectionKpiCards({ data }) {
                   variant="outlined"
                   sx={{ height: 18, ...fSmall, '& .MuiChip-icon': { ml: 0.3 } }}
                 />
+                <Typography sx={{ ...fSmall, color: 'text.disabled' }}>
+                  Baseline: {card.baseline.toLocaleString()}{card.unit ? ` ${card.unit}` : ''}
+                </Typography>
                 <MiniSparkline data={card.trend} color={accentColor} />
               </Box>
-              <Typography sx={{ ...fSmall, color: 'text.disabled', mt: 0.3 }}>
-                Baseline: {card.baseline.toLocaleString()}{card.unit ? ` ${card.unit}` : ''}
-              </Typography>
             </Card>
           </Grid>
         )

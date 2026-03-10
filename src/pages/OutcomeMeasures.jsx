@@ -1,17 +1,15 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { Box, CircularProgress, Alert, Container } from '@mui/material'
+import { Box, CircularProgress, Alert, Container, Collapse, IconButton, Typography } from '@mui/material'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { useFilters } from '../FilterContext'
 import { useRefresh } from '../RefreshContext'
 import buildFilterQueryString from '../utils/buildFilterQueryString'
 import { API_URL } from '../config'
 import AppTreeSidebar from '../components/AppTreeSidebar'
 import ExecutiveKpiBar from '../components/outcome-measures/ExecutiveKpiBar'
-import ExecutiveSummary from '../components/outcome-measures/ExecutiveSummary'
 import SectionTabs from '../components/outcome-measures/SectionTabs'
 import SectionKpiCards from '../components/outcome-measures/SectionKpiCards'
 import OutcomeTrendChart from '../components/outcome-measures/OutcomeTrendChart'
-import WorkstreamCards from '../components/outcome-measures/WorkstreamCards'
-import CoverageSection from '../components/outcome-measures/CoverageSection'
 
 function buildTreeFilterQs(baseQs, seals) {
   if (!seals || seals.length === 0) return baseQs
@@ -21,7 +19,6 @@ function buildTreeFilterQs(baseQs, seals) {
 
 export default function OutcomeMeasures() {
   const [summary, setSummary] = useState(null)
-  const [execSummary, setExecSummary] = useState(null)
   const [sectionData, setSectionData] = useState(null)
   const [apps, setApps] = useState([])
   const [loading, setLoading] = useState(true)
@@ -31,6 +28,8 @@ export default function OutcomeMeasures() {
   const [selectedPath, setSelectedPath] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [treeSeals, setTreeSeals] = useState(null)
+  const [baselinePeriod, setBaselinePeriod] = useState('12m')
+  const [detailOpen, setDetailOpen] = useState(false)
 
   const { activeFilters, searchText } = useFilters()
   const { refreshTick, reportUpdated } = useRefresh()
@@ -55,12 +54,6 @@ export default function OutcomeMeasures() {
       .then(setSummary)
   }, [])
 
-  const fetchExecSummary = useCallback((qs = '') => {
-    return fetch(`${API_URL}/api/outcome-measures/executive-summary${qs}`)
-      .then(r => { if (!r.ok) throw new Error(`exec-summary — ${r.status}`); return r.json() })
-      .then(setExecSummary)
-  }, [])
-
   const fetchSection = useCallback((sectionId, qs = '') => {
     return fetch(`${API_URL}/api/outcome-measures/section/${sectionId}${qs}`)
       .then(r => { if (!r.ok) throw new Error(`section — ${r.status}`); return r.json() })
@@ -72,12 +65,11 @@ export default function OutcomeMeasures() {
     return Promise.all([
       fetchApps(qs),
       fetchSummary(qs),
-      fetchExecSummary(qs),
       fetchSection(sectionId, qs),
     ])
       .then(() => reportUpdated())
       .catch(e => setError(e.message))
-  }, [fetchApps, fetchSummary, fetchExecSummary, fetchSection, reportUpdated])
+  }, [fetchApps, fetchSummary, fetchSection, reportUpdated])
 
   // Initial fetch
   useEffect(() => {
@@ -103,6 +95,7 @@ export default function OutcomeMeasures() {
   // Fetch section when tab changes
   const handleSectionChange = useCallback((sectionId) => {
     setActiveSection(sectionId)
+    setDetailOpen(true)
     setError(null)
     setSectionData(null)
     const qs = buildTreeFilterQs(filterQsRef.current, treeSealRef.current)
@@ -151,37 +144,34 @@ export default function OutcomeMeasures() {
         width={280}
       />
       <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 1.5, sm: 2 } }}>
-        {/* Executive KPI Bar — 3 buckets */}
-        <ExecutiveKpiBar kpis={summary?.executive_kpis || []} appCount={summary?.app_count || 0} />
+        {/* Executive KPI Bar — 3 hero cards */}
+        <ExecutiveKpiBar kpis={summary?.executive_kpis || []} appCount={summary?.app_count || 0} baselinePeriod={baselinePeriod} onBaselinePeriodChange={setBaselinePeriod} />
 
-        {/* Workstream Effectiveness */}
-        <ExecutiveSummary data={execSummary} />
-
-        {/* Section Tabs */}
-        <SectionTabs
-          sections={sections}
-          activeSection={activeSection}
-          onChange={handleSectionChange}
-        />
-
-        {/* Section Content */}
-        <Box sx={{ mt: 1 }}>
-          {sectionKey === 'workstream_details' ? (
-            <WorkstreamCards data={sectionData} />
-          ) : sectionKey === 'sre_coverage' ? (
-            <SectionKpiCards data={sectionData} />
-          ) : (
-            <SectionKpiCards data={sectionData} />
-          )}
-
-          {/* Trend Chart (not for workstream_details) */}
-          {sectionKey !== 'workstream_details' && sectionData && (
-            <OutcomeTrendChart
-              data={sectionData}
-              monthLabels={summary?.month_labels || []}
-            />
-          )}
+        {/* Detail Section — collapsed by default */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1.5 }}>
+          <IconButton size="small" onClick={() => setDetailOpen(o => !o)}>
+            <ExpandMoreIcon sx={{ transform: detailOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: '0.2s' }} />
+          </IconButton>
+          <Typography sx={{ fontWeight: 600, fontSize: 'clamp(0.85rem, 1.1vw, 0.95rem)', cursor: 'pointer' }} onClick={() => setDetailOpen(o => !o)}>
+            Detail Metrics
+          </Typography>
         </Box>
+        <Collapse in={detailOpen}>
+          <SectionTabs
+            sections={sections}
+            activeSection={activeSection}
+            onChange={handleSectionChange}
+          />
+          <Box sx={{ mt: 1 }}>
+            <SectionKpiCards data={sectionData} />
+            {sectionData && (
+              <OutcomeTrendChart
+                data={sectionData}
+                monthLabels={summary?.month_labels || []}
+              />
+            )}
+          </Box>
+        </Collapse>
       </Box>
     </Box>
   )

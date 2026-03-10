@@ -20,7 +20,7 @@ function buildTreeFilterQs(baseQs, seals) {
 export default function OutcomeMeasures() {
   const [summary, setSummary] = useState(null)
   const [sectionData, setSectionData] = useState(null)
-  const [apps, setApps] = useState([])
+  const [enrichedMap, setEnrichedMap] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeSection, setActiveSection] = useState(1)
@@ -31,7 +31,7 @@ export default function OutcomeMeasures() {
   const [baselinePeriod, setBaselinePeriod] = useState('12m')
   const [detailOpen, setDetailOpen] = useState(false)
 
-  const { activeFilters, searchText } = useFilters()
+  const { filteredApps, activeFilters, searchText } = useFilters()
   const { refreshTick, reportUpdated } = useRefresh()
   const filterQs = useMemo(
     () => buildFilterQueryString(activeFilters, searchText),
@@ -42,10 +42,22 @@ export default function OutcomeMeasures() {
   const treeSealRef = useRef(treeSeals)
   treeSealRef.current = treeSeals
 
-  const fetchApps = useCallback((qs = '') => {
-    return fetch(`${API_URL}/api/applications/enriched${qs}`)
+  // Merge client-side filtered apps with enriched data (same pattern as Applications page)
+  const treeApps = useMemo(() => {
+    return filteredApps.map(app => ({
+      ...app,
+      ...(enrichedMap[app.name] || {}),
+    }))
+  }, [filteredApps, enrichedMap])
+
+  const fetchEnrichedMap = useCallback(() => {
+    return fetch(`${API_URL}/api/applications/enriched`)
       .then(r => { if (!r.ok) throw new Error(`apps — ${r.status}`); return r.json() })
-      .then(setApps)
+      .then(appData => {
+        const map = {}
+        appData.forEach(app => { map[app.name] = app })
+        setEnrichedMap(map)
+      })
   }, [])
 
   const fetchSummary = useCallback((qs = '') => {
@@ -60,27 +72,29 @@ export default function OutcomeMeasures() {
       .then(setSectionData)
   }, [])
 
-  const fetchAll = useCallback((qs = '', sectionId = 1) => {
+  const fetchMetrics = useCallback((qs = '', sectionId = 1) => {
     setError(null)
     return Promise.all([
-      fetchApps(qs),
       fetchSummary(qs),
       fetchSection(sectionId, qs),
     ])
       .then(() => reportUpdated())
       .catch(e => setError(e.message))
-  }, [fetchApps, fetchSummary, fetchSection, reportUpdated])
+  }, [fetchSummary, fetchSection, reportUpdated])
 
-  // Initial fetch
+  // Initial fetch — enriched map (once) + metrics
   useEffect(() => {
-    fetchAll(filterQs, 1).finally(() => setLoading(false))
+    Promise.all([
+      fetchEnrichedMap(),
+      fetchMetrics(filterQs, 1),
+    ]).finally(() => setLoading(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-fetch when filters change
+  // Re-fetch metrics when filters change
   useEffect(() => {
     if (!loading) {
       const qs = buildTreeFilterQs(filterQsRef.current, treeSealRef.current)
-      fetchAll(qs, activeSection)
+      fetchMetrics(qs, activeSection)
     }
   }, [filterQs]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -88,7 +102,7 @@ export default function OutcomeMeasures() {
   useEffect(() => {
     if (refreshTick > 0) {
       const qs = buildTreeFilterQs(filterQsRef.current, treeSealRef.current)
-      fetchAll(qs, activeSection)
+      fetchMetrics(qs, activeSection)
     }
   }, [refreshTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -109,8 +123,8 @@ export default function OutcomeMeasures() {
     treeSealRef.current = seals
     const qs = buildTreeFilterQs(filterQsRef.current, seals)
     setError(null)
-    fetchAll(qs, activeSection)
-  }, [activeSection, fetchAll]) // eslint-disable-line react-hooks/exhaustive-deps
+    fetchMetrics(qs, activeSection)
+  }, [activeSection, fetchMetrics]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -134,7 +148,7 @@ export default function OutcomeMeasures() {
   return (
     <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       <AppTreeSidebar
-        apps={apps}
+        apps={treeApps}
         selectedPath={selectedPath}
         onSelect={handleTreeSelect}
         statusFilter={statusFilter}

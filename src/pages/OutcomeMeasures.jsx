@@ -10,7 +10,6 @@ import ExecutiveSummary from '../components/outcome-measures/ExecutiveSummary'
 import SectionTabs from '../components/outcome-measures/SectionTabs'
 import SectionKpiCards from '../components/outcome-measures/SectionKpiCards'
 import OutcomeTrendChart from '../components/outcome-measures/OutcomeTrendChart'
-import OutcomeLeaderboard from '../components/outcome-measures/OutcomeLeaderboard'
 import WorkstreamCards from '../components/outcome-measures/WorkstreamCards'
 import CoverageSection from '../components/outcome-measures/CoverageSection'
 
@@ -24,13 +23,10 @@ export default function OutcomeMeasures() {
   const [summary, setSummary] = useState(null)
   const [execSummary, setExecSummary] = useState(null)
   const [sectionData, setSectionData] = useState(null)
-  const [leaderboard, setLeaderboard] = useState(null)
-  const [coverage, setCoverage] = useState(null)
   const [apps, setApps] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeSection, setActiveSection] = useState(1)
-  const [sortBy, setSortBy] = useState(null)
   const [treeMode, setTreeMode] = useState('technology')
   const [selectedPath, setSelectedPath] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
@@ -71,34 +67,17 @@ export default function OutcomeMeasures() {
       .then(setSectionData)
   }, [])
 
-  const fetchLeaderboard = useCallback((sectionId, qs = '', sort = null) => {
-    const sortParam = sort ? `&sort_by=${sort}` : ''
-    const sep = qs ? '&' : '?'
-    const url = `${API_URL}/api/outcome-measures/leaderboard?section_id=${sectionId}${sortParam}${qs ? sep + qs.slice(1) : ''}`
-    return fetch(url)
-      .then(r => { if (!r.ok) throw new Error(`leaderboard — ${r.status}`); return r.json() })
-      .then(setLeaderboard)
-  }, [])
-
-  const fetchCoverage = useCallback((qs = '') => {
-    return fetch(`${API_URL}/api/outcome-measures/coverage${qs}`)
-      .then(r => { if (!r.ok) throw new Error(`coverage — ${r.status}`); return r.json() })
-      .then(setCoverage)
-  }, [])
-
-  const fetchAll = useCallback((qs = '', sectionId = 1, sort = null) => {
+  const fetchAll = useCallback((qs = '', sectionId = 1) => {
     setError(null)
     return Promise.all([
       fetchApps(qs),
       fetchSummary(qs),
       fetchExecSummary(qs),
       fetchSection(sectionId, qs),
-      fetchLeaderboard(sectionId, qs, sort),
-      ...(sectionId === 5 ? [fetchCoverage(qs)] : []),
     ])
       .then(() => reportUpdated())
       .catch(e => setError(e.message))
-  }, [fetchApps, fetchSummary, fetchExecSummary, fetchSection, fetchLeaderboard, fetchCoverage, reportUpdated])
+  }, [fetchApps, fetchSummary, fetchExecSummary, fetchSection, reportUpdated])
 
   // Initial fetch
   useEffect(() => {
@@ -108,9 +87,8 @@ export default function OutcomeMeasures() {
   // Re-fetch when filters change
   useEffect(() => {
     if (!loading) {
-      setSortBy(null)
       const qs = buildTreeFilterQs(filterQsRef.current, treeSealRef.current)
-      fetchAll(qs, activeSection, null)
+      fetchAll(qs, activeSection)
     }
   }, [filterQs]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -118,33 +96,18 @@ export default function OutcomeMeasures() {
   useEffect(() => {
     if (refreshTick > 0) {
       const qs = buildTreeFilterQs(filterQsRef.current, treeSealRef.current)
-      fetchAll(qs, activeSection, sortBy)
+      fetchAll(qs, activeSection)
     }
   }, [refreshTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch section + leaderboard when tab changes
+  // Fetch section when tab changes
   const handleSectionChange = useCallback((sectionId) => {
     setActiveSection(sectionId)
-    setSortBy(null)
     setError(null)
     setSectionData(null)
-    setLeaderboard(null)
-    if (sectionId !== 5) setCoverage(null)
     const qs = buildTreeFilterQs(filterQsRef.current, treeSealRef.current)
-    Promise.all([
-      fetchSection(sectionId, qs),
-      fetchLeaderboard(sectionId, qs),
-      ...(sectionId === 5 ? [fetchCoverage(qs)] : []),
-    ]).catch(e => setError(e.message))
-  }, [fetchSection, fetchLeaderboard, fetchCoverage])
-
-  // Re-fetch leaderboard when sort changes
-  const handleSortChange = useCallback((newSort) => {
-    setSortBy(newSort)
-    const qs = buildTreeFilterQs(filterQsRef.current, treeSealRef.current)
-    fetchLeaderboard(activeSection, qs, newSort)
-      .catch(e => setError(e.message))
-  }, [activeSection, fetchLeaderboard])
+    fetchSection(sectionId, qs).catch(e => setError(e.message))
+  }, [fetchSection])
 
   const handleTreeSelect = useCallback((path, selectedApps) => {
     setSelectedPath(path)
@@ -152,9 +115,8 @@ export default function OutcomeMeasures() {
     setTreeSeals(seals)
     treeSealRef.current = seals
     const qs = buildTreeFilterQs(filterQsRef.current, seals)
-    setSortBy(null)
     setError(null)
-    fetchAll(qs, activeSection, null)
+    fetchAll(qs, activeSection)
   }, [activeSection, fetchAll]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
@@ -189,10 +151,10 @@ export default function OutcomeMeasures() {
         width={280}
       />
       <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 1.5, sm: 2 } }}>
-        {/* Executive KPI Bar */}
+        {/* Executive KPI Bar — 3 buckets */}
         <ExecutiveKpiBar kpis={summary?.executive_kpis || []} appCount={summary?.app_count || 0} />
 
-        {/* Executive Summary */}
+        {/* Workstream Effectiveness */}
         <ExecutiveSummary data={execSummary} />
 
         {/* Section Tabs */}
@@ -204,29 +166,19 @@ export default function OutcomeMeasures() {
 
         {/* Section Content */}
         <Box sx={{ mt: 1 }}>
-          {sectionKey === 'workstreams' ? (
+          {sectionKey === 'workstream_details' ? (
             <WorkstreamCards data={sectionData} />
-          ) : sectionKey === 'baselines' ? (
-            <CoverageSection sectionData={sectionData} coverage={coverage} />
+          ) : sectionKey === 'sre_coverage' ? (
+            <SectionKpiCards data={sectionData} />
           ) : (
             <SectionKpiCards data={sectionData} />
           )}
 
-          {/* Trend Chart (not for baselines) */}
-          {sectionKey !== 'baselines' && sectionData && (
+          {/* Trend Chart (not for workstream_details) */}
+          {sectionKey !== 'workstream_details' && sectionData && (
             <OutcomeTrendChart
               data={sectionData}
               monthLabels={summary?.month_labels || []}
-            />
-          )}
-
-          {/* Leaderboard */}
-          {leaderboard && (
-            <OutcomeLeaderboard
-              data={leaderboard}
-              sectionKey={sectionKey}
-              onSortChange={handleSortChange}
-              activeSortBy={sortBy}
             />
           )}
         </Box>

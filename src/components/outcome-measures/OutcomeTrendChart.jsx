@@ -10,20 +10,36 @@ const fTitle = { fontSize: 'clamp(0.8rem, 1vw, 0.9rem)' }
 const fSmall = { fontSize: 'clamp(0.6rem, 0.75vw, 0.68rem)' }
 
 const METRIC_LABELS = {
-  prompts: 'AI Prompts',
-  dau: 'Daily Active Users',
-  uop_views: 'UOP Page Views',
-  feature_adoption: 'Feature Adoption',
-  mttr: 'Mean Time to Resolve',
+  // Adoption
+  mcp_requests: 'MCP Requests',
+  uop_chat_prompts: 'UOP Chat Prompts',
+  clicks_blast_radius: 'Clicks — Blast Radius',
+  clicks_cuj: 'Clicks — CUJ',
+  clicks_slo_agent: 'Clicks — SLO Agent',
+  clicks_aura: 'Clicks — AURA',
+  devgpt_executions: 'DevGPT Executions',
+  simulation_executions: 'Simulations',
+  // SRE Coverage
+  sre_telemetry_coverage: 'SRE Telemetry Coverage',
+  uop_coverage: 'UOP Coverage',
+  dynatrace_coverage: 'Dynatrace Coverage',
+  golden_signals_coverage: 'Golden Signals Coverage',
+  // Results
+  incidents_avoided: 'Incidents Avoided',
   p1_incidents: 'P1 Incidents',
   p2_incidents: 'P2 Incidents',
-  noise_events: 'Noise Events',
-  true_impact_dur: 'True Impact Duration',
-  slo_compliance: 'SLO Compliance',
-  error_budget: 'Error Budget',
-  service_requests: 'Service Requests',
-  self_service_pct: 'Self-Service Rate',
-  escalations: 'Escalations',
+  p3_incidents: 'P3 Incidents',
+  p4_incidents: 'P4 Incidents',
+  p5_incidents: 'P5 Incidents',
+  mttr_p1: 'MTTR P1',
+  mttr_p2: 'MTTR P2',
+  mttr_p3: 'MTTR P3',
+  ai_impact_duration: 'AI Impact Duration',
+  anomaly_rate: 'Anomaly Rate',
+  cost_reduction_zero_touch: 'Cost Reduction (Zero Touch)',
+  cost_reduction_techsupport: 'Cost Reduction (TechSupport)',
+  alert_noise_reduction: 'Alert Noise Reduction',
+  suppression_rate: 'Suppression Rate',
 }
 
 const COLORS = ['#42a5f5', '#66bb6a', '#ff7043', '#ab47bc', '#ffa726', '#26c6da', '#ef5350']

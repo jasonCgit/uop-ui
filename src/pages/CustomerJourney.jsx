@@ -1,140 +1,161 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import {
-  Container, Typography, Box, Card, CardContent,
-  Chip, Grid, Divider, LinearProgress, ToggleButtonGroup, ToggleButton,
-} from '@mui/material'
-import CheckCircleIcon    from '@mui/icons-material/CheckCircle'
-import ErrorIcon          from '@mui/icons-material/Error'
-import WarningIcon        from '@mui/icons-material/Warning'
-import ArrowForwardIcon   from '@mui/icons-material/ArrowForward'
+import { Box, CircularProgress, Alert, Container, Tabs, Tab } from '@mui/material'
+import RouteIcon from '@mui/icons-material/Route'
+import BuildIcon from '@mui/icons-material/Build'
+import DashboardIcon from '@mui/icons-material/Dashboard'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
+import SecurityIcon from '@mui/icons-material/Security'
+import MapIcon from '@mui/icons-material/Map'
+import { useFilters } from '../FilterContext'
+import { useRefresh } from '../RefreshContext'
+import buildFilterQueryString from '../utils/buildFilterQueryString'
+import { API_URL } from '../config'
+import AppTreeSidebar from '../components/AppTreeSidebar'
+import JourneyFlowClassic from '../components/customer-journeys/JourneyFlowClassic'
+import JourneyBuilder from '../components/customer-journeys/JourneyBuilder'
+import JourneyHealthDashboard from '../components/customer-journeys/JourneyHealthDashboard'
+import JourneyAnalytics from '../components/customer-journeys/JourneyAnalytics'
+import JourneyRiskReadiness from '../components/customer-journeys/JourneyRiskReadiness'
+import JourneyMapEditor from '../components/customer-journeys/JourneyMapEditor'
 
-const STATUS_ICON  = { healthy: CheckCircleIcon, critical: ErrorIcon, warning: WarningIcon }
-const STATUS_COLOR = { healthy: '#4caf50', critical: '#f44336', warning: '#ff9800' }
+const TABS = [
+  { label: 'Journey Flow', Icon: RouteIcon },
+  { label: 'Health Dashboard', Icon: DashboardIcon },
+  { label: 'Journey Builder', Icon: BuildIcon },
+  { label: 'Analytics & Trends', Icon: TrendingUpIcon },
+  { label: 'Risk & Readiness', Icon: SecurityIcon },
+  { label: 'Journey Map', Icon: MapIcon },
+]
 
-const JOURNEYS = {
-  'Trade Execution': [
-    { step: 'Authentication',      service: 'AUTH-SERVICE-V2',           status: 'healthy',  latency: '42ms',  errorRate: '0.0%' },
-    { step: 'Market Data Fetch',   service: 'MERIDIAN SERVICE-QUERY V1', status: 'critical', latency: '3200ms',errorRate: '12.4%'},
-    { step: 'Portfolio Validation',service: 'IPBOL-INVESTMENTS-SERVICES', status: 'warning',  latency: '280ms', errorRate: '2.1%' },
-    { step: 'Order Placement',     service: 'MERIDIAN SERVICE-ORDER V1', status: 'warning',  latency: '490ms', errorRate: '1.8%' },
-    { step: 'Payment Processing',  service: 'PAYMENT GATEWAY API',       status: 'critical', latency: '8100ms',errorRate: '9.7%' },
-    { step: 'Confirmation Email',  service: 'EMAIL-NOTIFICATION-SERVICE',status: 'critical', latency: '—',     errorRate: '100%' },
-  ],
-  'Client Login': [
-    { step: 'DNS Resolution',      service: 'API-GATEWAY',               status: 'healthy',  latency: '8ms',   errorRate: '0.0%' },
-    { step: 'Authentication',      service: 'AUTH-SERVICE-V2',           status: 'healthy',  latency: '38ms',  errorRate: '0.0%' },
-    { step: 'Session Cache',       service: 'REDIS-CACHE-CLUSTER',       status: 'healthy',  latency: '5ms',   errorRate: '0.1%' },
-    { step: 'Account Load',        service: 'IPBOL-ACCOUNT-SERVICES',    status: 'warning',  latency: '620ms', errorRate: '1.4%' },
-    { step: 'Dashboard Render',    service: 'ACTIVE-ADVISORY',           status: 'healthy',  latency: '190ms', errorRate: '0.2%' },
-  ],
-  'Document Delivery': [
-    { step: 'Auth Check',          service: 'AUTH-SERVICE-V2',           status: 'healthy',  latency: '35ms',  errorRate: '0.0%' },
-    { step: 'Doc Domain Lookup',   service: 'IPBOL-DOC-DOMAIN',          status: 'critical', latency: '4800ms',errorRate: '18.2%'},
-    { step: 'Contact Sync',        service: 'IPBOL-CONTACT-SYNC',        status: 'healthy',  latency: '95ms',  errorRate: '0.3%' },
-    { step: 'Delivery',            service: 'IPBOL-DOC-DELIVERY#GREEN',  status: 'healthy',  latency: '210ms', errorRate: '0.0%' },
-    { step: 'Notification',        service: 'EMAIL-NOTIFICATION-SERVICE',status: 'critical', latency: '—',     errorRate: '100%' },
-  ],
+function buildTreeFilterQs(baseQs, seals) {
+  if (!seals || seals.length === 0) return baseQs
+  const sealParams = seals.map(s => `seal=${encodeURIComponent(s)}`).join('&')
+  return baseQs ? `${baseQs}&${sealParams}` : `?${sealParams}`
 }
 
 export default function CustomerJourney() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [activeJourney, setActiveJourney] = useState(() =>
-    searchParams.get('journey') || sessionStorage.getItem('cj-active-journey') || 'Trade Execution'
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = parseInt(searchParams.get('tab') || '0', 10)
+    return t >= 0 && t < TABS.length ? t : 0
+  })
+  const [enrichedMap, setEnrichedMap] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [treeMode, setTreeMode] = useState('technology')
+  const [selectedPath, setSelectedPath] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [treeSeals, setTreeSeals] = useState(null)
+
+  const { filteredApps, activeFilters, searchText } = useFilters()
+  const { refreshTick, reportUpdated } = useRefresh()
+  const filterQs = useMemo(
+    () => buildFilterQueryString(activeFilters, searchText),
+    [activeFilters, searchText]
   )
+  const filterQsRef = useRef(filterQs)
+  filterQsRef.current = filterQs
+  const treeSealRef = useRef(treeSeals)
+  treeSealRef.current = treeSeals
+
+  // Persist tab in URL
   useEffect(() => {
-    sessionStorage.setItem('cj-active-journey', activeJourney)
     setSearchParams(prev => {
       const next = new URLSearchParams(prev)
-      next.delete('journey')
-      if (activeJourney !== 'Trade Execution') next.set('journey', activeJourney)
+      next.delete('tab')
+      if (activeTab !== 0) next.set('tab', String(activeTab))
       return next
     }, { replace: true })
-  }, [activeJourney]) // eslint-disable-line react-hooks/exhaustive-deps
-  const steps = JOURNEYS[activeJourney]
-  const overallStatus = steps.some(s => s.status === 'critical') ? 'critical' : steps.some(s => s.status === 'warning') ? 'warning' : 'healthy'
+  }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Merge client-side filtered apps with enriched data
+  const treeApps = useMemo(() => {
+    return filteredApps.map(app => ({
+      ...app,
+      ...(enrichedMap[app.name] || {}),
+    }))
+  }, [filteredApps, enrichedMap])
+
+  // Fetch enriched map once
+  useEffect(() => {
+    fetch(`${API_URL}/api/applications/enriched`)
+      .then(r => { if (!r.ok) throw new Error(`apps — ${r.status}`); return r.json() })
+      .then(appData => {
+        const map = {}
+        appData.forEach(app => { map[app.name] = app })
+        setEnrichedMap(map)
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  // Build effective query string
+  const effectiveQs = useMemo(
+    () => buildTreeFilterQs(filterQs, treeSeals),
+    [filterQs, treeSeals]
+  )
+
+  const handleTreeSelect = useCallback((path, selectedApps) => {
+    setSelectedPath(path)
+    const seals = (!path || path === 'all') ? null : selectedApps.map(a => a.seal)
+    setTreeSeals(seals)
+    treeSealRef.current = seals
+  }, [])
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}>
+        <CircularProgress />
+      </Box>
+    )
+  }
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 1.5, sm: 2 }, px: { xs: 2, sm: 3 } }}>
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="h5" fontWeight={700} gutterBottom>Customer Journey</Typography>
-        <Typography variant="body2" color="text.secondary">End-to-end service path health for key user workflows</Typography>
+    <Box sx={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      <AppTreeSidebar
+        apps={treeApps}
+        selectedPath={selectedPath}
+        onSelect={handleTreeSelect}
+        statusFilter={statusFilter}
+        onStatusFilter={setStatusFilter}
+        treeMode={treeMode}
+        onTreeModeChange={setTreeMode}
+        width={280}
+      />
+      <Box sx={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+        {error && (
+          <Alert severity="error" sx={{ m: 1.5 }}>Failed to load: {error}</Alert>
+        )}
+
+        {/* Sub-tabs */}
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, pt: 0.5 }}>
+          <Tabs
+            value={activeTab}
+            onChange={(_, v) => setActiveTab(v)}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{
+              minHeight: 36,
+              '& .MuiTab-root': { minHeight: 36, py: 0.5, textTransform: 'none', fontSize: '0.82rem', fontWeight: 600 },
+            }}
+          >
+            {TABS.map((tab, i) => (
+              <Tab key={i} label={tab.label} icon={<tab.Icon sx={{ fontSize: 16 }} />} iconPosition="start" />
+            ))}
+          </Tabs>
+        </Box>
+
+        {/* Tab content */}
+        <Box sx={{ flex: 1, overflow: 'auto', p: { xs: 1.5, sm: 2 } }}>
+          {activeTab === 0 && <JourneyFlowClassic />}
+          {activeTab === 1 && <JourneyHealthDashboard filterQs={effectiveQs} refreshTick={refreshTick} />}
+          {activeTab === 2 && <JourneyBuilder filterQs={effectiveQs} refreshTick={refreshTick} />}
+          {activeTab === 3 && <JourneyAnalytics filterQs={effectiveQs} refreshTick={refreshTick} />}
+          {activeTab === 4 && <JourneyRiskReadiness filterQs={effectiveQs} refreshTick={refreshTick} />}
+          {activeTab === 5 && <JourneyMapEditor filterQs={effectiveQs} refreshTick={refreshTick} />}
+        </Box>
       </Box>
-
-      {/* Journey selector */}
-      <ToggleButtonGroup value={activeJourney} exclusive onChange={(_, v) => v && setActiveJourney(v)} size="small" sx={{ mb: 2 }}>
-        {Object.keys(JOURNEYS).map(j => (
-          <ToggleButton key={j} value={j} sx={{ textTransform: 'none', fontSize: '0.82rem', px: 2 }}>{j}</ToggleButton>
-        ))}
-      </ToggleButtonGroup>
-
-      {/* Overall status banner */}
-      <Card sx={{ mb: 2, border: `1px solid ${STATUS_COLOR[overallStatus]}44` }}>
-        <CardContent sx={{ py: '12px !important', display: 'flex', alignItems: 'center', gap: 2 }}>
-          {(() => { const Icon = STATUS_ICON[overallStatus]; return <Icon sx={{ color: STATUS_COLOR[overallStatus], fontSize: 22 }} /> })()}
-          <Box>
-            <Typography variant="body1" fontWeight={700}>{activeJourney} — {overallStatus.toUpperCase()}</Typography>
-            <Typography variant="caption" color="text.secondary">
-              {steps.filter(s => s.status === 'critical').length} critical · {steps.filter(s => s.status === 'warning').length} warning · {steps.filter(s => s.status === 'healthy').length} healthy steps
-            </Typography>
-          </Box>
-          <Chip label={`${steps.length} steps`} size="small" sx={{ ml: 'auto', color: 'text.secondary' }} variant="outlined" />
-        </CardContent>
-      </Card>
-
-      {/* Journey flow */}
-      <Box sx={{ display: 'flex', alignItems: 'stretch', gap: 0, flexWrap: 'wrap', rowGap: 2 }}>
-        {steps.map((step, i) => {
-          const Icon = STATUS_ICON[step.status]
-          return (
-            <Box key={step.step} sx={{ display: 'flex', alignItems: 'center', flex: '1 1 auto', minWidth: 180 }}>
-              <Card sx={{ flex: 1, border: `1px solid ${STATUS_COLOR[step.status]}44`, height: '100%' }}>
-                <CardContent sx={{ py: 1.5, px: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.6, fontSize: '0.65rem' }}>
-                      Step {i + 1}
-                    </Typography>
-                    <Icon sx={{ fontSize: 14, color: STATUS_COLOR[step.status] }} />
-                  </Box>
-                  <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25, lineHeight: 1.3 }}>{step.step}</Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.68rem', display: 'block', mb: 1, lineHeight: 1.4 }}>{step.service}</Typography>
-                  <Divider sx={{ mb: 1 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">Latency</Typography>
-                    <Typography variant="caption" fontWeight={600} sx={{ color: step.latency === '—' ? '#f44336' : 'text.primary' }}>{step.latency}</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="caption" color="text.secondary">Error rate</Typography>
-                    <Typography variant="caption" fontWeight={600} sx={{ color: parseFloat(step.errorRate) > 5 ? '#f44336' : parseFloat(step.errorRate) > 0 ? '#ff9800' : '#4caf50' }}>
-                      {step.errorRate}
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-              {i < steps.length - 1 && (
-                <ArrowForwardIcon sx={{ fontSize: 16, color: 'text.disabled', mx: 0.5, flexShrink: 0, display: { xs: 'none', sm: 'block' } }} />
-              )}
-            </Box>
-          )
-        })}
-      </Box>
-
-      {/* Health bars */}
-      <Grid container spacing={2} sx={{ mt: 3 }}>
-        {steps.map(step => (
-          <Grid item xs={12} sm={6} md={4} key={step.step}>
-            <Box sx={{ mb: 0.5, display: 'flex', justifyContent: 'space-between' }}>
-              <Typography variant="caption" color="text.secondary">{step.step}</Typography>
-              <Typography variant="caption" sx={{ color: STATUS_COLOR[step.status], fontWeight: 600 }}>{step.errorRate} errors</Typography>
-            </Box>
-            <LinearProgress
-              variant="determinate"
-              value={Math.max(0, 100 - parseFloat(step.errorRate))}
-              sx={{ height: 6, borderRadius: 3, bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.08)', '& .MuiLinearProgress-bar': { bgcolor: STATUS_COLOR[step.status], borderRadius: 3 } }}
-            />
-          </Grid>
-        ))}
-      </Grid>
-    </Container>
+    </Box>
   )
 }

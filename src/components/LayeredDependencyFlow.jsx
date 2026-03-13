@@ -213,10 +213,10 @@ function buildLayeredGraph(apiData, activeLayers) {
     }
   }
 
-  // Grid-layout orphan component nodes to the right of the dagre subgraph
+  // Grid-layout orphan component nodes below the dagre subgraph
   const orphanPositions = gridLayoutOrphans(orphanIds, connectedBounds, {
     nodeW: NODE_DIMS.service.w, nodeH: NODE_DIMS.service.h,
-    gapX: 50, gapY: 30, cols: 4,
+    gapX: 50, gapY: 30, cols: 4, placement: 'below',
   })
 
   // Collect component center positions (including external nodes)

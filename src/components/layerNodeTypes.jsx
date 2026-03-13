@@ -289,7 +289,10 @@ export const ZoneNode = memo(({ data }) => {
       pointerEvents: 'none',
     }}>
       <Typography sx={{
-        position: 'absolute', top: 14, left: '50%', transform: 'translateX(-50%)',
+        position: 'absolute',
+        ...(data.labelPosition === 'bottom'
+          ? { bottom: 14, left: '50%', transform: 'translateX(-50%)' }
+          : { top: 14, left: '50%', transform: 'translateX(-50%)' }),
         fontSize: '1.1rem', fontWeight: 900, letterSpacing: 3,
         color: labelCol, textTransform: 'uppercase', whiteSpace: 'nowrap',
       }}>

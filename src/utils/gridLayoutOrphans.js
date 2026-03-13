@@ -21,26 +21,31 @@ export function partitionByConnectivity(nodeIds, edges) {
 }
 
 /**
- * Arrange orphan nodes in a compact grid, positioned to the right of
- * dagre-laid-out connected nodes (or centered at origin if none).
+ * Arrange orphan nodes in a compact grid relative to dagre-laid-out connected nodes.
  *
  * @param {string[]} orphanIds - IDs of nodes with no edges
  * @param {{ minX: number, maxX: number, minY: number, maxY: number } | null} connectedBounds
- * @param {{ nodeW: number, nodeH: number, gapX?: number, gapY?: number, cols?: number }} opts
+ * @param {{ nodeW: number, nodeH: number, gapX?: number, gapY?: number, cols?: number, placement?: 'right' | 'below' }} opts
  * @returns {Object<string, { x: number, y: number }>} center positions keyed by node ID
  */
 export function gridLayoutOrphans(orphanIds, connectedBounds, opts) {
   if (orphanIds.length === 0) return {}
 
-  const { nodeW, nodeH, gapX = 60, gapY = 40, cols = 4 } = opts
+  const { nodeW, nodeH, gapX = 60, gapY = 40, cols = 4, placement = 'right' } = opts
   const cellW = nodeW + gapX
   const cellH = nodeH + gapY
 
-  // Grid origin: right of connected bounds, or at (0,0)
   let originX, originY
   if (connectedBounds) {
-    originX = connectedBounds.maxX + gapX + nodeW / 2
-    originY = connectedBounds.minY
+    if (placement === 'below') {
+      // Grid starts below the connected bounds, left-aligned with connected nodes
+      originX = connectedBounds.minX
+      originY = connectedBounds.maxY + nodeH + gapY
+    } else {
+      // Grid starts to the right of connected bounds
+      originX = connectedBounds.maxX + nodeW + gapX
+      originY = connectedBounds.minY
+    }
   } else {
     originX = 0
     originY = 0

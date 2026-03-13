@@ -390,12 +390,28 @@ export const InteractiveEdge = memo(({
   )
 })
 
+// ── Max indicators to show inline before switching to summary mode ──────────
+const IND_GROUP_INLINE_MAX = 5
+
 // ── Indicator group node (vertically stacked indicators for one component) ──
+// When a component has more than IND_GROUP_INLINE_MAX indicators, renders a
+// compact summary (health counts by color). Click opens the detail panel.
 export const IndicatorGroupNode = memo(({ data }) => {
   const theme = useTheme()
   const isDark = theme.palette.mode === 'dark'
   const indicators = data.indicators || []
   const hasImpacted = indicators.some(ind => ind.health === 'red' || ind.health === 'amber')
+  const useSummary = indicators.length > IND_GROUP_INLINE_MAX
+
+  // Aggregate health counts for summary mode
+  const healthCounts = useSummary ? indicators.reduce((acc, ind) => {
+    const key = ind.health || 'no_data'
+    acc[key] = (acc[key] || 0) + 1
+    return acc
+  }, {}) : null
+
+  // Ordered: red first, then amber, green, no_data
+  const SUMMARY_ORDER = ['red', 'amber', 'green', 'no_data']
 
   return (
     <Box sx={{
@@ -418,30 +434,59 @@ export const IndicatorGroupNode = memo(({ data }) => {
       }}>
         Indicators ({indicators.length})
       </Typography>
-      {indicators.map((ind, i) => {
-        const healthColor = HEALTH_STATUS_TEXT[ind.health] || '#94a3b8'
-        const healthLabel = HEALTH_STATUS_LABEL[ind.health] || 'unknown'
-        const typeLabel = INDICATOR_TYPE_LABELS[ind.indicator_type] || 'INDICATOR'
-        const isImpacted = ind.health === 'red' || ind.health === 'amber'
-        return (
-          <Box key={ind.id || i} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, py: 0.15 }}>
-            <Box sx={{
-              width: 6, height: 6, borderRadius: '50%', bgcolor: healthColor, flexShrink: 0,
-              ...(isImpacted && { animation: 'indicatorDotPulse 1s ease-in-out infinite' }),
-            }} />
-            <Typography sx={{ fontSize: '0.56rem', color: healthColor, fontWeight: 600,
-              textTransform: 'uppercase', letterSpacing: 0.3, flexShrink: 0, minWidth: 42 }}>
-              {healthLabel}
-            </Typography>
-            <Typography noWrap sx={{
-              fontSize: '0.56rem', fontWeight: 500,
-              color: isDark ? '#fff' : '#000', lineHeight: 1.2,
-            }}>
-              {typeLabel}: {ind.label}
-            </Typography>
+
+      {useSummary ? (
+        /* ── Summary mode: health-count chips ── */
+        <>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+            {SUMMARY_ORDER.filter(k => healthCounts[k]).map(key => {
+              const color = HEALTH_STATUS_TEXT[key] || '#94a3b8'
+              const label = HEALTH_STATUS_LABEL[key] || 'unknown'
+              return (
+                <Box key={key} sx={{ display: 'flex', alignItems: 'center', gap: 0.4,
+                  bgcolor: `${color}18`, borderRadius: 0.75, px: 0.6, py: 0.15 }}>
+                  <Box sx={{
+                    width: 6, height: 6, borderRadius: '50%', bgcolor: color, flexShrink: 0,
+                    ...((key === 'red' || key === 'amber') && { animation: 'indicatorDotPulse 1s ease-in-out infinite' }),
+                  }} />
+                  <Typography sx={{ fontSize: '0.56rem', color, fontWeight: 700, letterSpacing: 0.3 }}>
+                    {healthCounts[key]} {label}
+                  </Typography>
+                </Box>
+              )
+            })}
           </Box>
-        )
-      })}
+          <Typography sx={{ fontSize: '0.46rem', color: '#94a3b8', mt: 0.4, fontStyle: 'italic' }}>
+            Click for details
+          </Typography>
+        </>
+      ) : (
+        /* ── Inline mode: full indicator list ── */
+        indicators.map((ind, i) => {
+          const healthColor = HEALTH_STATUS_TEXT[ind.health] || '#94a3b8'
+          const healthLabel = HEALTH_STATUS_LABEL[ind.health] || 'unknown'
+          const typeLabel = INDICATOR_TYPE_LABELS[ind.indicator_type] || 'INDICATOR'
+          const isImpacted = ind.health === 'red' || ind.health === 'amber'
+          return (
+            <Box key={ind.id || i} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, py: 0.15 }}>
+              <Box sx={{
+                width: 6, height: 6, borderRadius: '50%', bgcolor: healthColor, flexShrink: 0,
+                ...(isImpacted && { animation: 'indicatorDotPulse 1s ease-in-out infinite' }),
+              }} />
+              <Typography sx={{ fontSize: '0.56rem', color: healthColor, fontWeight: 600,
+                textTransform: 'uppercase', letterSpacing: 0.3, flexShrink: 0, minWidth: 42 }}>
+                {healthLabel}
+              </Typography>
+              <Typography noWrap sx={{
+                fontSize: '0.56rem', fontWeight: 500,
+                color: isDark ? '#fff' : '#000', lineHeight: 1.2,
+              }}>
+                {typeLabel}: {ind.label}
+              </Typography>
+            </Box>
+          )
+        })
+      )}
     </Box>
   )
 })

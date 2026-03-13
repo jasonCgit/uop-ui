@@ -13,6 +13,7 @@ import '@xyflow/react/dist/style.css'
 import { Box } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import dagre from '@dagrejs/dagre'
+import { partitionByConnectivity, gridLayoutOrphans } from '../utils/gridLayoutOrphans'
 import { layerNodeTypes, layerEdgeTypes } from './layerNodeTypes'
 
 // ── Color helpers ────────────────────────────────────────────────────────────
@@ -171,18 +172,28 @@ function buildLayeredGraph(apiData, activeLayers) {
   const showCrossApp = activeLayers.crossapp !== false
   const extNodes = showCrossApp ? extNodesRaw : []
   const extIds = new Set(extNodes.map(n => n.id))
-  compNodes.forEach(n => {
-    const dims = NODE_DIMS.service
-    g.setNode(n.id, { width: dims.w + PAD_X, height: dims.h + PAD_Y })
-  })
-  extNodes.forEach(n => {
-    const dims = NODE_DIMS.service
-    g.setNode(n.id, { width: dims.w + PAD_X, height: dims.h + PAD_Y })
-  })
+
   // Only include edges that have both endpoints in the graph
   const activeEdges = compEdges.filter(e => {
     const isCross = extIds.has(e.source) || extIds.has(e.target)
     return !isCross || showCrossApp
+  })
+
+  // Partition component nodes into connected vs orphan (no edges at all)
+  const compIds = compNodes.map(n => n.id)
+  const { orphanIds } = partitionByConnectivity(compIds, activeEdges)
+  const orphanSet = new Set(orphanIds)
+
+  // Only add connected component nodes to dagre; orphans get grid layout
+  compNodes.forEach(n => {
+    if (!orphanSet.has(n.id)) {
+      const dims = NODE_DIMS.service
+      g.setNode(n.id, { width: dims.w + PAD_X, height: dims.h + PAD_Y })
+    }
+  })
+  extNodes.forEach(n => {
+    const dims = NODE_DIMS.service
+    g.setNode(n.id, { width: dims.w + PAD_X, height: dims.h + PAD_Y })
   })
   activeEdges.forEach(e => {
     g.setEdge(e.source, e.target, { weight: 1, minlen: 1 })
@@ -190,11 +201,33 @@ function buildLayeredGraph(apiData, activeLayers) {
 
   dagre.layout(g)
 
+  // Compute bounding box of dagre-positioned component nodes
+  const dagreCompIds = compIds.filter(id => !orphanSet.has(id))
+  let connectedBounds = null
+  if (dagreCompIds.length > 0) {
+    const xs = dagreCompIds.map(id => g.node(id).x)
+    const ys = dagreCompIds.map(id => g.node(id).y)
+    connectedBounds = {
+      minX: Math.min(...xs), maxX: Math.max(...xs),
+      minY: Math.min(...ys), maxY: Math.max(...ys),
+    }
+  }
+
+  // Grid-layout orphan component nodes to the right of the dagre subgraph
+  const orphanPositions = gridLayoutOrphans(orphanIds, connectedBounds, {
+    nodeW: NODE_DIMS.service.w, nodeH: NODE_DIMS.service.h,
+    gapX: 50, gapY: 30, cols: 4,
+  })
+
   // Collect component center positions (including external nodes)
   const compPos = {}
   compNodes.forEach(n => {
-    const p = g.node(n.id)
-    compPos[n.id] = { x: p.x, y: p.y }
+    if (orphanPositions[n.id]) {
+      compPos[n.id] = orphanPositions[n.id]
+    } else {
+      const p = g.node(n.id)
+      compPos[n.id] = { x: p.x, y: p.y }
+    }
   })
   extNodes.forEach(n => {
     const p = g.node(n.id)
@@ -294,7 +327,10 @@ function buildLayeredGraph(apiData, activeLayers) {
     const IND_ROW_H = 18
     const IND_GROUP_TOP = 26   // header + top padding
     const IND_GROUP_BOT = 10   // bottom padding
-    const groupHeight = (count) => IND_GROUP_TOP + count * IND_ROW_H + IND_GROUP_BOT
+    const IND_SUMMARY_H = 62   // compact height when >5 indicators (summary chips + hint)
+    const IND_GROUP_INLINE_MAX = 5
+    const groupHeight = (count) =>
+      count > IND_GROUP_INLINE_MAX ? IND_SUMMARY_H : IND_GROUP_TOP + count * IND_ROW_H + IND_GROUP_BOT
 
     // Build one layout item per component group, pinned to parent X
     const groupItems = Object.entries(compIndicators)

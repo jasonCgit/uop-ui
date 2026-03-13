@@ -32,6 +32,7 @@ const ALL_SEALS = [
   { seal: '91001', label: 'Quantum' },
   { seal: '62100', label: 'Real-Time Payments Gateway' },
   { seal: '90215', label: 'Spectrum Portfolio Mgmt' },
+  { seal: '77777', label: 'Digital Channels Platform' },
 ]
 
 // ── Layer definitions ───────────────────────────────────────────────────────
@@ -70,6 +71,7 @@ const SEAL_NARRATIVES = {
   '102987': 'WEAVE policy engine degraded due to user directory synchronization failures. Event bus message backlog causing delayed entitlement propagation across downstream consuming applications. Multiple identity sync retries observed.',
   '90215': 'Settlement processing backlog due to payment gateway throttling under peak load. API gateway circuit breakers tripping intermittently, causing notification delivery delays and partial trade reconciliation failures across Spectrum services.',
   '62100': 'Routing engine experiencing critical failures during cross-border payment classification. Clearing and settlement engines backlogged as sanctions screening latency impacts downstream processing. FX conversion service intermittently timing out on rate lookups.',
+  '77777': 'Partially onboarded application — dependency edges not yet mapped from knowledge graph. API gateway showing elevated error rates across multiple synthetic monitors. Mobile BFF in critical state with cascading failures to downstream notification pipeline.',
 }
 
 // ── SEAL-specific business processes (matches original Blast Radius) ──────────
@@ -144,6 +146,12 @@ const SEAL_BUSINESS_PROCESSES = {
     { name: 'FX Conversion',            status: 'warning',  desc: 'Multi-currency conversion and rate lookup' },
     { name: 'Reconciliation',           status: 'healthy',  desc: 'End-of-day position reconciliation' },
     { name: 'Health Monitoring',        status: 'warning',  desc: 'Platform-wide health and SLA tracking' },
+  ],
+  '77777': [
+    { name: 'Web Portal',              status: 'healthy',  desc: 'Client-facing web portal and content delivery' },
+    { name: 'API Gateway',             status: 'warning',  desc: 'Central API gateway and request routing' },
+    { name: 'Mobile Experience',       status: 'critical', desc: 'Mobile BFF and native app integration' },
+    { name: 'Authentication',          status: 'healthy',  desc: 'User authentication and session management' },
   ],
 }
 

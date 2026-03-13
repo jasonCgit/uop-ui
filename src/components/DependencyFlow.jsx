@@ -14,6 +14,7 @@ import '@xyflow/react/dist/style.css'
 import { Box, Typography } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
 import dagre from '@dagrejs/dagre'
+import { partitionByConnectivity, gridLayoutOrphans } from '../utils/gridLayoutOrphans'
 
 // ── Status color map ──────────────────────────────────────────────────────────
 const STATUS = {
@@ -195,6 +196,12 @@ function buildGraphElements(apiData, mode) {
     edgeCount[e.target] = (edgeCount[e.target] || 0) + 1
   })
 
+  // Partition nodes into connected (have edges) vs orphan (no edges)
+  // Root always goes through dagre as the focal node
+  const allIds = [root.id, ...serviceList.map(s => s.id)]
+  const { orphanIds: rawOrphanIds } = partitionByConnectivity(allIds, validEdges)
+  const orphanSet = new Set(rawOrphanIds.filter(id => id !== root.id))
+
   // Create dagre graph
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
@@ -211,9 +218,11 @@ function buildGraphElements(apiData, mode) {
   // Add root node with padding so edges route around the full visual area
   g.setNode(root.id, { width: ROOT_W + NODE_PAD_X, height: ROOT_H + NODE_PAD_Y })
 
-  // Add service nodes with padding
+  // Add only connected service nodes to dagre; orphans get grid layout
   serviceList.forEach(svc => {
-    g.setNode(svc.id, { width: SVC_W + NODE_PAD_X, height: SVC_H + NODE_PAD_Y })
+    if (!orphanSet.has(svc.id)) {
+      g.setNode(svc.id, { width: SVC_W + NODE_PAD_X, height: SVC_H + NODE_PAD_Y })
+    }
   })
 
   // Add edges with weight hints — higher-connectivity nodes get heavier edges
@@ -228,7 +237,23 @@ function buildGraphElements(apiData, mode) {
   // Run dagre layout
   dagre.layout(g)
 
-  // Build ReactFlow nodes from dagre positions
+  // Compute bounding box of dagre-positioned nodes for grid placement
+  const dagreIds = [root.id, ...serviceList.filter(s => !orphanSet.has(s.id)).map(s => s.id)]
+  const dagreXs = dagreIds.map(id => g.node(id).x)
+  const dagreYs = dagreIds.map(id => g.node(id).y)
+  const connectedBounds = {
+    minX: Math.min(...dagreXs), maxX: Math.max(...dagreXs),
+    minY: Math.min(...dagreYs), maxY: Math.max(...dagreYs),
+  }
+
+  // Grid-layout orphan nodes to the right of the dagre subgraph
+  const orphanPositions = gridLayoutOrphans(
+    [...orphanSet],
+    connectedBounds,
+    { nodeW: SVC_W, nodeH: SVC_H, gapX: 100, gapY: 60, cols: 4 },
+  )
+
+  // Build ReactFlow nodes from dagre + grid positions
   const rfNodes = [
     {
       id: root.id,
@@ -240,13 +265,14 @@ function buildGraphElements(apiData, mode) {
       data: { ...root },
     },
     ...serviceList.map(svc => {
-      const pos = g.node(svc.id)
+      const gridPos = orphanPositions[svc.id]
+      const center = gridPos || { x: g.node(svc.id).x, y: g.node(svc.id).y }
       return {
         id: svc.id,
         type: 'service',
         position: {
-          x: pos.x - SVC_W / 2,
-          y: pos.y - SVC_H / 2,
+          x: center.x - SVC_W / 2,
+          y: center.y - SVC_H / 2,
         },
         data: { ...svc },
       }
